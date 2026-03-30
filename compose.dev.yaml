@@ -1,0 +1,21 @@
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: Containerfile.dev
+    # Podman-specific: disable SELinux isolation
+    security_opt:
+      - label=disable
+    env_file:
+      - .dev.env
+  database:
+      image: docker.io/postgres:18.2
+      environment:
+        POSTGRES_USER: techtonic
+        POSTGRES_PASSWORD: H34AGlTYqH
+        POSTGRES_DB: techtonic
+      ports:
+        - "5432:5432"
+
+    
+  

@@ -1,4 +1,5 @@
 using HotChocolate;
+using HotChocolate.Authorization;
 using HotChocolate.Types;
 
 using Microsoft.EntityFrameworkCore;
@@ -58,6 +59,7 @@ public class AssignRoleInput
 
 public class UserMutation
 {
+    [Authorize("Users:Create")]
     public async Task<UserEntity> Create(
         CreateUserInput input,
         [Service] TechtonicCmsDbContext db,
@@ -66,7 +68,6 @@ public class UserMutation
         [Service] IHttpContextAccessor httpContextAccessor)
     {
         var currentUserId = GetUserId(httpContextAccessor);
-        await abacService.RequirePermissionAsync(currentUserId, BaseResource.Users, PermissionAction.Create);
 
         var passwordHash = passwordService.HashPassword(input.Password);
 
@@ -106,6 +107,7 @@ public class UserMutation
         return user;
     }
 
+    [Authorize("Users:Update")]
     public async Task<UserEntity> Update(
         UpdateUserInput input,
         [Service] TechtonicCmsDbContext db,
@@ -114,8 +116,7 @@ public class UserMutation
         [Service] IHttpContextAccessor httpContextAccessor)
     {
         var currentUserId = GetUserId(httpContextAccessor);
-        await abacService.RequirePermissionAsync(currentUserId, BaseResource.Users, PermissionAction.Update);
-
+        
         var user = await db.Users.FindAsync(input.Id);
         if (user is null)
             throw new GraphQLException(ErrorBuilder.New()
@@ -140,6 +141,7 @@ public class UserMutation
         return user;
     }
 
+    [Authorize("Users:Delete")]
     public async Task<bool> Delete(
         Guid id,
         [Service] TechtonicCmsDbContext db,
@@ -148,7 +150,6 @@ public class UserMutation
         [Service] IHttpContextAccessor httpContextAccessor)
     {
         var currentUserId = GetUserId(httpContextAccessor);
-        await abacService.RequirePermissionAsync(currentUserId, BaseResource.Users, PermissionAction.Delete);
 
         if (currentUserId == id)
             throw new GraphQLException(ErrorBuilder.New()
@@ -216,6 +217,7 @@ public class UserMutation
         return true;
     }
 
+    [Authorize("Users:Update")]
     public async Task<bool> AssignRole(
         AssignRoleInput input,
         [Service] TechtonicCmsDbContext db,
@@ -223,7 +225,6 @@ public class UserMutation
         [Service] IHttpContextAccessor httpContextAccessor)
     {
         var currentUserId = GetUserId(httpContextAccessor);
-        await abacService.RequirePermissionAsync(currentUserId, BaseResource.Users, PermissionAction.Update);
 
         var user = await db.Users.FindAsync(input.UserId);
         if (user is null)
@@ -264,6 +265,7 @@ public class UserMutation
         return true;
     }
 
+    [Authorize("Users:Update")]
     public async Task<bool> UnassignRole(
         Guid userId,
         Guid roleId,
@@ -272,7 +274,6 @@ public class UserMutation
         [Service] IHttpContextAccessor httpContextAccessor)
     {
         var currentUserId = GetUserId(httpContextAccessor);
-        await abacService.RequirePermissionAsync(currentUserId, BaseResource.Users, PermissionAction.Update);
 
         var userRole = await db.UserRoles
             .FirstOrDefaultAsync(ur => ur.UserId == userId && ur.RoleId == roleId);
@@ -286,6 +287,7 @@ public class UserMutation
         return true;
     }
 
+    [Authorize("Users:Activate")]
     public async Task<UserEntity> Activate(
         Guid id,
         [Service] TechtonicCmsDbContext db,
@@ -293,7 +295,6 @@ public class UserMutation
         [Service] IHttpContextAccessor httpContextAccessor)
     {
         var currentUserId = GetUserId(httpContextAccessor);
-        await abacService.RequirePermissionAsync(currentUserId, BaseResource.Users, PermissionAction.Activate);
 
         var user = await db.Users.FindAsync(id);
         if (user is null)
@@ -309,6 +310,7 @@ public class UserMutation
         return user;
     }
 
+    [Authorize("Users:Deactivate")]
     public async Task<UserEntity> Deactivate(
         Guid id,
         [Service] TechtonicCmsDbContext db,
@@ -317,7 +319,6 @@ public class UserMutation
         [Service] IHttpContextAccessor httpContextAccessor)
     {
         var currentUserId = GetUserId(httpContextAccessor);
-        await abacService.RequirePermissionAsync(currentUserId, BaseResource.Users, PermissionAction.Deactivate);
 
         if (currentUserId == id)
             throw new GraphQLException(ErrorBuilder.New()
@@ -340,7 +341,7 @@ public class UserMutation
 
         return user;
     }
-
+    [Authorize("Users:Ban")]
     public async Task<UserEntity> Ban(
         Guid id,
         [Service] TechtonicCmsDbContext db,
@@ -349,7 +350,6 @@ public class UserMutation
         [Service] IHttpContextAccessor httpContextAccessor)
     {
         var currentUserId = GetUserId(httpContextAccessor);
-        await abacService.RequirePermissionAsync(currentUserId, BaseResource.Users, PermissionAction.Ban);
 
         if (currentUserId == id)
             throw new GraphQLException(ErrorBuilder.New()
@@ -373,6 +373,7 @@ public class UserMutation
         return user;
     }
 
+    [Authorize("Users:Unban")]
     public async Task<UserEntity> Unban(
         Guid id,
         [Service] TechtonicCmsDbContext db,
@@ -380,7 +381,6 @@ public class UserMutation
         [Service] IHttpContextAccessor httpContextAccessor)
     {
         var currentUserId = GetUserId(httpContextAccessor);
-        await abacService.RequirePermissionAsync(currentUserId, BaseResource.Users, PermissionAction.Unban);
 
         var user = await db.Users.FindAsync(id);
         if (user is null)

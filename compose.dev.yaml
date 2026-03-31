@@ -3,19 +3,72 @@ services:
     build:
       context: .
       dockerfile: Containerfile.dev
-    # Podman-specific: disable SELinux isolation
     security_opt:
       - label=disable
     env_file:
       - .dev.env
-  database:
-      image: docker.io/postgres:18.2
-      environment:
-        POSTGRES_USER: techtonic
-        POSTGRES_PASSWORD: H34AGlTYqH
-        POSTGRES_DB: techtonic
-      ports:
-        - "5432:5432"
+    depends_on:
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rustfs:
+        condition: service_healthy
 
-    
-  
+  database:
+    image: docker.io/postgres:18.2
+    security_opt:
+      - label=disable
+    environment:
+      POSTGRES_USER: techtonic
+      POSTGRES_PASSWORD: H34AGlTYqH
+      POSTGRES_DB: techtonic
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U techtonic"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: docker.io/redis:8.2.0-alpine
+    restart: always
+    security_opt:
+      - label=disable
+    ports:
+      - "6379:6379"
+    command: redis-server --save 20 1 --loglevel warning --requirepass techtonicz
+    volumes:
+      - redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "techtonicz", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rustfs:
+    image: docker.io/rustfs/rustfs:alpha
+    security_opt:
+      - label=disable
+    ports:
+      - "9000:9000"
+    volumes:
+      - rustfs_data:/data
+      - rustfs_logs:/logs
+    environment:
+      RUSTFS_ROOT_USER: rustfsadmin
+      RUSTFS_ROOT_PASSWORD: rustfsadmin
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pg_data:
+  redis:
+  rustfs_data:
+  rustfs_logs:

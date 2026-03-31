@@ -1,8 +1,7 @@
 namespace TechtonicCmsApi.Types;
 
 [QueryType]
-public static class Query
+public class Query
 {
-    public static Book GetBook()
-        => new Book("C# in depth.", new Author("Jon Skeet"));
+    public string HelloWorld() => "Hello from Techtonic CMS!";
 }

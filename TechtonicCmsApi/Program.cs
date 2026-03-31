@@ -70,9 +70,12 @@ builder.Services.AddAuthorization(options =>
 builder.Services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, AbacAuthorizationHandler>();
 builder.Services.AddHttpContextAccessor();
 
-builder.Services.AddGraphQL()
+builder.AddGraphQL()
     .AddTypes()
     .AddAuthorization()
+    .AddProjections()
+    .AddFiltering()
+    .AddSorting()
     .ModifyRequestOptions(options =>
     {
         options.IncludeExceptionDetails = builder.Environment.IsDevelopment();

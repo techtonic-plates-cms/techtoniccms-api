@@ -11,11 +11,10 @@ using TechtonicCmsApi.Services;
 
 namespace TechtonicCmsApi.Types.Auth;
 
-[ExtendObjectType(typeof(Mutation))]
-public static class AuthMutations
+public class AuthMutation
 {
     [AllowAnonymous]
-    public static async Task<LoginPayload> Login(
+    public async Task<LoginPayload> Login(
         string name,
         string password,
         [Service] TechtonicCmsDbContext db,
@@ -57,7 +56,7 @@ public static class AuthMutations
     }
 
     [AllowAnonymous]
-    public static async Task<RefreshPayload> Refresh(
+    public async Task<RefreshPayload> Refresh(
         string refreshToken,
         [Service] AuthService authService,
         [Service] SessionService sessionService)
@@ -117,7 +116,7 @@ public static class AuthMutations
     }
 
     [Authorize]
-    public static async Task<LogoutPayload> Logout(
+    public async Task<LogoutPayload> Logout(
         [Service] IHttpContextAccessor httpContextAccessor,
         [Service] AuthService authService,
         [Service] SessionService sessionService)
@@ -140,7 +139,7 @@ public static class AuthMutations
     }
 
     [Authorize]
-    public static async Task<LogoutPayload> LogoutAll(
+    public async Task<LogoutPayload> LogoutAll(
         [Service] IHttpContextAccessor httpContextAccessor,
         [Service] AuthService authService,
         [Service] SessionService sessionService)
@@ -153,4 +152,10 @@ public static class AuthMutations
 
         return new LogoutPayload { Message = "Logged out from all devices" };
     }
+}
+
+[ExtendObjectType(nameof(Mutation))]
+public static class AuthMutations
+{
+    public static AuthMutation Auth() => new();
 }

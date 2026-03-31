@@ -56,7 +56,7 @@ public class AssignRoleInput
     public string? ExpiresAt { get; set; }
 }
 
-public class UserMutationCommands
+public class UserMutation
 {
     public async Task<UserEntity> Create(
         CreateUserInput input,
@@ -409,8 +409,8 @@ public class UserMutationCommands
     }
 }
 
-[ExtendObjectType(typeof(Mutation))]
+[ExtendObjectType(nameof(Mutation))]
 public static class UserMutations
 {
-    public static UserMutationCommands Users() => new();
+    public static UserMutation Users() => new();
 }

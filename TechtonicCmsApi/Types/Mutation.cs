@@ -1,6 +1,7 @@
 namespace TechtonicCmsApi.Types;
 
 [MutationType]
-public class Mutation
+public partial class Mutation
 {
+    public string _placeholder => "_";
 }

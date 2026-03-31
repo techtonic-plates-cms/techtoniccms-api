@@ -8,11 +8,10 @@ using TechtonicCmsApi.Services;
 
 namespace TechtonicCmsApi.Types.Auth;
 
-[ExtendObjectType(typeof(Query))]
-public static class AuthQueries
+public class AuthQuery
 {
     [Authorize]
-    public static async Task<User?> Me(
+    public async Task<User?> Me(
         [Service] TechtonicCmsDbContext db,
         [Service] IHttpContextAccessor httpContextAccessor)
     {
@@ -22,4 +21,10 @@ public static class AuthQueries
 
         return await db.Users.FindAsync(userId);
     }
+}
+
+[ExtendObjectType(nameof(Query))]
+public static class AuthQueries
+{
+    public static AuthQuery Auth() => new();
 }

@@ -18,8 +18,8 @@ public class RoleRefDto
     public DateTime? ExpiresAt { get; set; }
 }
 
-[ObjectType]
-public class RoleRefType
+[ObjectType<RoleRefDto>]
+public static partial class RoleRefType
 {
     public static string GetId([Parent] RoleRefDto role) => role.Id.ToString();
 
@@ -35,8 +35,8 @@ public class RoleRefType
         role.ExpiresAt?.ToUniversalTime().ToString("o");
 }
 
-[ObjectType]
-public class UserType
+[ObjectType<User>]
+public static partial class UserType
 {
     public static string GetId([Parent] User user) => user.Id.ToString();
 
@@ -74,21 +74,4 @@ public class UserType
         return userRoles;
     }
 
-    public static void Configure(IObjectTypeDescriptor<User> descriptor)
-    {
-        descriptor.Ignore(u => u.PasswordHash);
-        descriptor.Ignore(u => u.UserRoles);
-        descriptor.Ignore(u => u.AssignedPolicies);
-        descriptor.Ignore(u => u.PoliciesAssignedBy);
-        descriptor.Ignore(u => u.OwnedResources);
-        descriptor.Ignore(u => u.ResourcesAssignedBy);
-        descriptor.Ignore(u => u.CreatedPolicies);
-        descriptor.Ignore(u => u.RolePoliciesAssignedBy);
-        descriptor.Ignore(u => u.CreatedCollections);
-        descriptor.Ignore(u => u.CreatedFields);
-        descriptor.Ignore(u => u.CreatedEntries);
-        descriptor.Ignore(u => u.UploadedAssets);
-        descriptor.Ignore(u => u.EvaluationCaches);
-        descriptor.Ignore(u => u.AuditLogs);
-    }
 }

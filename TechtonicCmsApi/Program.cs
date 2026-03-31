@@ -71,15 +71,16 @@ builder.Services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHand
 builder.Services.AddHttpContextAccessor();
 
 builder.AddGraphQL()
-    .AddTypes()
+
     .AddAuthorization()
     .AddProjections()
     .AddFiltering()
     .AddSorting()
+    .AddPagingArguments()
     .ModifyRequestOptions(options =>
     {
         options.IncludeExceptionDetails = builder.Environment.IsDevelopment();
-    });
+    }).AddTypes();
 
 var app = builder.Build();
 

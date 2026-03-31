@@ -12,11 +12,10 @@ using UserEntity = TechtonicCmsApi.Schema.TechtonicCms.Entities.User;
 
 namespace TechtonicCmsApi.Types.Users;
 
-[ExtendObjectType(typeof(Query))]
-public static class UserQueries
+public class UserQuery
 {
     [Authorize]
-    public static async Task<UserEntity?> User(
+    public async Task<UserEntity?> User(
         Guid? id,
         string? name,
         [Service] TechtonicCmsDbContext db,
@@ -46,7 +45,7 @@ public static class UserQueries
     [UsePaging(MaxPageSize = 100)]
     [UseFiltering]
     [UseSorting]
-    public static async Task<IEnumerable<UserEntity>> Users(
+    public async Task<IEnumerable<UserEntity>> Users(
         string? search,
         UserStatus? status,
         int? limit,
@@ -86,4 +85,10 @@ public static class UserQueries
 
         return userId;
     }
+}
+
+[ExtendObjectType(nameof(Query))]
+public static class UserQueries
+{
+    public static UserQuery Users() => new();
 }

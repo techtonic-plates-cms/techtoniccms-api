@@ -21,46 +21,6 @@ public class UpdateAssetInput
 public class AssetMutation
 {
     [Authorize]
-    public async Task<Asset> Upload(
-        IFile file,
-        string? alt,
-        string? caption,
-        bool? isPublic,
-        [Service] TechtonicCmsDbContext db,
-        [Service] S3Service s3Service,
-        [Service] AbacService abacService,
-        [Service] IHttpContextAccessor httpContextAccessor)
-    {
-        var userId = GetUserId(httpContextAccessor);
-        await abacService.RequirePermissionAsync(userId, BaseResource.Assets, PermissionAction.Upload);
-
-        await using var stream = file.OpenReadStream();
-        var filename = file.Name ?? "upload";
-        var contentType = string.IsNullOrEmpty(file.ContentType)
-            ? s3Service.GetContentType(filename)
-            : file.ContentType;
-        var s3Key = s3Service.GenerateS3Key(filename, userId);
-        await s3Service.UploadAsync(s3Key, stream, contentType);
-
-        var asset = new Asset
-        {
-            Id = Guid.NewGuid(),
-            Filename = filename,
-            MimeType = contentType,
-            FileSize = (int)file.Length!,
-            Path = s3Key,
-            UploadedBy = userId,
-            UploadedAt = DateTime.UtcNow,
-            Alt = alt,
-            Caption = caption,
-            IsPublic = isPublic ?? false
-        };
-        db.Assets.Add(asset);
-        await db.SaveChangesAsync();
-        return asset;
-    }
-
-    [Authorize]
     public async Task<Asset> Update(
         UpdateAssetInput input,
         [Service] TechtonicCmsDbContext db,

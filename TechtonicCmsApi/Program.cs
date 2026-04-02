@@ -5,6 +5,7 @@ using TechtonicCmsApi.Contexts;
 using TechtonicCmsApi.Schema.TechtonicCms;
 using TechtonicCmsApi.Security;
 using TechtonicCmsApi.Services;
+using TechtonicCmsApi.Types.Assets;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -83,12 +84,18 @@ using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<TechtonicCmsDbContext>();
     dbContext.Database.Migrate();
+
+    var passwordService = scope.ServiceProvider.GetRequiredService<PasswordService>();
+    var config = scope.ServiceProvider.GetRequiredService<IConfiguration>();
+    await AdminBootstrapService.SeedAsync(dbContext, passwordService, config);
 }
 
 app.UseSecurityHeaders();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.MapAssetEndpoints();
 
 app.MapGraphQL();
 

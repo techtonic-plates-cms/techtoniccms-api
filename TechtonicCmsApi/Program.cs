@@ -8,13 +8,9 @@ using TechtonicCmsApi.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
-var databasePort = Environment.GetEnvironmentVariable("DATABASE_PORT");
-var databaseUser = Environment.GetEnvironmentVariable("DATABASE_USER");
-var databasePassword = Environment.GetEnvironmentVariable("DATABASE_PASSWORD");
-var databaseName = Environment.GetEnvironmentVariable("DATABASE_NAME");
+builder.Configuration.AddEnvironmentVariables();
 
-var connectionString = $"Host={databaseUrl};Port={databasePort};Username={databaseUser};Password={databasePassword};Database={databaseName}";
+var connectionString = $"Host={builder.Configuration["Database:Url"]};Port={builder.Configuration["Database:Port"]};Username={builder.Configuration["Database:User"]};Password={builder.Configuration["Database:Password"]};Database={builder.Configuration["Database:Name"]}";
 
 builder.Services.AddDbContext<TechtonicCmsDbContext>(options =>
     options.UseNpgsql(connectionString));
@@ -33,9 +29,9 @@ builder.Services.AddOptions<S3Options>()
 builder.Services.AddOptions<JwtOptions>()
     .Bind(builder.Configuration.GetSection("Jwt"));
 
-var rsaPublicKeyPem = Environment.GetEnvironmentVariable("JWT_PUBLIC_KEY");
-var rsaPrivateKeyPem = Environment.GetEnvironmentVariable("JWT_SECRET_KEY");
-var issuer = Environment.GetEnvironmentVariable("JWT_ISSUER") ?? "TechtonicCmsApi";
+var rsaPublicKeyPem = builder.Configuration["Jwt:RsaPublicKeyPem"];
+var rsaPrivateKeyPem = builder.Configuration["Jwt:RsaPrivateKeyPem"];
+var issuer = builder.Configuration["Jwt:Issuer"] ?? "techtonic-cms";
 
 var rsa = System.Security.Cryptography.RSA.Create();
 if (!string.IsNullOrWhiteSpace(rsaPrivateKeyPem))
@@ -64,11 +60,12 @@ builder.Services.AddAuthorization(options =>
 {
     SecurityPolicies.Register(options);
 });
+
 builder.Services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, AbacAuthorizationHandler>();
+
 builder.Services.AddHttpContextAccessor();
 
 builder.AddGraphQL()
-
     .AddAuthorization()
     .AddProjections()
     .AddFiltering()

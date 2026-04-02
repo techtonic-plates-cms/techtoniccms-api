@@ -74,7 +74,8 @@ builder.AddGraphQL()
     .ModifyRequestOptions(options =>
     {
         options.IncludeExceptionDetails = builder.Environment.IsDevelopment();
-    }).AddTypes();
+    })
+    .AddTypes();
 
 var app = builder.Build();
 

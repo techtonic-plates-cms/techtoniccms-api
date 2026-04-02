@@ -5,14 +5,14 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
-using TechtonicCmsApi.Schema.TechtonicCms;
+using TechtonicCmsApi.Contexts;
 
 #nullable disable
 
 namespace TechtonicCmsApi.Migrations
 {
     [DbContext(typeof(TechtonicCmsDbContext))]
-    [Migration("20260330211851_InitialMigration")]
+    [Migration("20260402182520_InitialMigration")]
     partial class InitialMigration
     {
         /// <inheritdoc />

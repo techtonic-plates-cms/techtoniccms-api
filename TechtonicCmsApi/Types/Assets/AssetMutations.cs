@@ -47,7 +47,7 @@ public class AssetMutation
             Id = Guid.NewGuid(),
             Filename = filename,
             MimeType = contentType,
-            FileSize = (int)file.Length,
+            FileSize = (int)file.Length!,
             Path = s3Key,
             UploadedBy = userId,
             UploadedAt = DateTime.UtcNow,

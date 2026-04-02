@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-
+using TechtonicCmsApi.Contexts;
 using TechtonicCmsApi.Schema.TechtonicCms;
 using TechtonicCmsApi.Security;
 using TechtonicCmsApi.Services;
@@ -33,12 +33,9 @@ builder.Services.AddOptions<S3Options>()
 builder.Services.AddOptions<JwtOptions>()
     .Bind(builder.Configuration.GetSection("Jwt"));
 
-var rsaPublicKeyPem = Environment.GetEnvironmentVariable("JWT_PUBLIC_KEY")
-    ?? builder.Configuration["Jwt:RsaPublicKeyPem"]
-    ?? "";
-var rsaPrivateKeyPem = Environment.GetEnvironmentVariable("JWT_SECRET_KEY")
-    ?? builder.Configuration["Jwt:RsaPrivateKeyPem"];
-var issuer = builder.Configuration["Jwt:Issuer"] ?? "techtonic-cms";
+var rsaPublicKeyPem = Environment.GetEnvironmentVariable("JWT_PUBLIC_KEY");
+var rsaPrivateKeyPem = Environment.GetEnvironmentVariable("JWT_SECRET_KEY");
+var issuer = Environment.GetEnvironmentVariable("JWT_ISSUER") ?? "TechtonicCmsApi";
 
 var rsa = System.Security.Cryptography.RSA.Create();
 if (!string.IsNullOrWhiteSpace(rsaPrivateKeyPem))

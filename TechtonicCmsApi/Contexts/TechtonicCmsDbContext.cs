@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using TechtonicCmsApi.Schema.TechtonicCms.Entities;
 using TechtonicCmsApi.Schema.TechtonicCms.Enums;
 
-namespace TechtonicCmsApi.Schema.TechtonicCms;
+namespace TechtonicCmsApi.Contexts;
 
 public class TechtonicCmsDbContext : DbContext
 {
@@ -62,7 +62,7 @@ public class TechtonicCmsDbContext : DbContext
         modelBuilder.HasPostgresEnum<PermissionEffect>();
         modelBuilder.HasPostgresEnum<AttributePath>();
         modelBuilder.HasPostgresEnum<OperatorType>();
-        modelBuilder.HasPostgresEnum<Enums.ValueType>();
+        modelBuilder.HasPostgresEnum<Schema.TechtonicCms.Enums.ValueType>();
         modelBuilder.HasPostgresEnum<LogicalOperator>();
         modelBuilder.HasPostgresEnum<EntryStatus>();
         modelBuilder.HasPostgresEnum<Locale>();

@@ -114,4 +114,41 @@ public class S3Service
         var timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         return $"uploads/{userId}/{timestamp}-{random}-{sanitized}";
     }
+
+    public string GetContentType(string filename)
+    {
+        var ext = System.IO.Path.GetExtension(filename).TrimStart('.').ToLowerInvariant();
+        return ext switch
+        {
+            "jpg" or "jpeg" => "image/jpeg",
+            "png" => "image/png",
+            "gif" => "image/gif",
+            "webp" => "image/webp",
+            "svg" => "image/svg+xml",
+            "ico" => "image/x-icon",
+            "pdf" => "application/pdf",
+            "doc" => "application/msword",
+            "docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "xls" => "application/vnd.ms-excel",
+            "xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "ppt" => "application/vnd.ms-powerpoint",
+            "pptx" => "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            "txt" => "text/plain",
+            "csv" => "text/csv",
+            "json" => "application/json",
+            "xml" => "application/xml",
+            "html" => "text/html",
+            "css" => "text/css",
+            "js" => "text/javascript",
+            "zip" => "application/zip",
+            "tar" => "application/x-tar",
+            "gz" => "application/gzip",
+            "mp3" => "audio/mpeg",
+            "mp4" => "video/mp4",
+            "avi" => "video/x-msvideo",
+            "mov" => "video/quicktime",
+            "wav" => "audio/wav",
+            _ => "application/octet-stream"
+        };
+    }
 }

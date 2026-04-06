@@ -26,7 +26,6 @@ public class Field
     [Column(TypeName = "text")]
     public string? Description { get; set; }
 
-    public required Enums.DataType DataType { get; set; }
     public required bool IsRequired { get; set; }
     public required bool IsUnique { get; set; }
     public required bool IsPublic { get; set; }
@@ -53,15 +52,18 @@ public class Field
 
     public Collection Collection { get; set; } = null!;
     public User CreatedByUser { get; set; } = null!;
-    public ICollection<EntryRelation> EntryRelations { get; set; } = new List<EntryRelation>();
-    public ICollection<EntryTypstText> EntryTypstTexts { get; set; } = new List<EntryTypstText>();
-    public ICollection<EntryText> EntryTexts { get; set; } = new List<EntryText>();
-    public ICollection<EntryBoolean> EntryBooleans { get; set; } = new List<EntryBoolean>();
-    public ICollection<EntryNumber> EntryNumbers { get; set; } = new List<EntryNumber>();
-    public ICollection<EntryDateTime> EntryDateTimes { get; set; } = new List<EntryDateTime>();
-    public ICollection<EntryRichText> EntryRichTexts { get; set; } = new List<EntryRichText>();
-    public ICollection<EntryJsonData> EntryJsonData { get; set; } = new List<EntryJsonData>();
-    public ICollection<EntryAsset> EntryAssets { get; set; } = new List<EntryAsset>();
-    public ICollection<AbacEvaluationCache> EvaluationCaches { get; set; } = new List<AbacEvaluationCache>();
-    public ICollection<AbacAudit> AuditLogs { get; set; } = new List<AbacAudit>();
+
+    public required FieldDataType DataType { get; set; }
+
+    /* public ICollection<EntryRelation> EntryRelations { get; set; } = new List<EntryRelation>();
+     public ICollection<EntryTypstText> EntryTypstTexts { get; set; } = new List<EntryTypstText>();
+     public ICollection<EntryText> EntryTexts { get; set; } = new List<EntryText>();
+     public ICollection<EntryBoolean> EntryBooleans { get; set; } = new List<EntryBoolean>();
+     public ICollection<EntryNumber> EntryNumbers { get; set; } = new List<EntryNumber>();
+     public ICollection<EntryDateTime> EntryDateTimes { get; set; } = new List<EntryDateTime>();
+     public ICollection<EntryRichText> EntryRichTexts { get; set; } = new List<EntryRichText>();
+     public ICollection<EntryJsonData> EntryJsonData { get; set; } = new List<EntryJsonData>();
+     public ICollection<EntryAsset> EntryAssets { get; set; } = new List<EntryAsset>();
+     public ICollection<AbacEvaluationCache> EvaluationCaches { get; set; } = new List<AbacEvaluationCache>();
+     public ICollection<AbacAudit> AuditLogs { get; set; } = new List<AbacAudit>(); */
 }

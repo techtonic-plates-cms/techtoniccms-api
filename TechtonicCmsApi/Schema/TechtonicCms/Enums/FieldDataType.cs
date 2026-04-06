@@ -1,9 +1,8 @@
 namespace TechtonicCmsApi.Schema.TechtonicCms.Enums;
 
-public enum DataType
+public enum FieldDataType
 {
     Text,
-    TypstText,
     Boolean,
     Number,
     DateTime,
@@ -12,5 +11,5 @@ public enum DataType
     NumberList,
     Asset,
     RichText,
-    Json
+    Object
 }

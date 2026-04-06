@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using TechtonicCmsApi.Schema.TechtonicCms.Enums;
 
@@ -33,7 +34,14 @@ public class Entry
 
     public User CreatedByUser { get; set; } = null!;
     public Collection Collection { get; set; } = null!;
-    public ICollection<EntryRelation> FromRelations { get; set; } = new List<EntryRelation>();
+
+    public required JsonDocument Data { get; set; }
+
+    public void Dispoe()
+    {
+        Data.Dispose();
+    }
+  /*  public ICollection<EntryRelation> FromRelations { get; set; } = new List<EntryRelation>();
     public ICollection<EntryRelation> ToRelations { get; set; } = new List<EntryRelation>();
     public ICollection<EntryTypstText> TypstTexts { get; set; } = new List<EntryTypstText>();
     public ICollection<EntryText> Texts { get; set; } = new List<EntryText>();
@@ -42,5 +50,5 @@ public class Entry
     public ICollection<EntryDateTime> DateTimes { get; set; } = new List<EntryDateTime>();
     public ICollection<EntryRichText> RichTexts { get; set; } = new List<EntryRichText>();
     public ICollection<EntryJsonData> JsonData { get; set; } = new List<EntryJsonData>();
-    public ICollection<EntryAsset> Assets { get; set; } = new List<EntryAsset>();
+    public ICollection<EntryAsset> Assets { get; set; } = new List<EntryAsset>(); */
 }

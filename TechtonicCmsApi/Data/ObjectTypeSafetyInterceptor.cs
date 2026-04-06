@@ -8,6 +8,7 @@ namespace TechtonicCmsApi.Data;
 
 public class ObjectTypeSafetyInterceptor : SaveChangesInterceptor
 {
+    // Keyed by Collection Id, containing the Field definitions for that collection
     private readonly Dictionary<Guid, List<Field>> _fieldSchemas;
 
     public ObjectTypeSafetyInterceptor(Dictionary<Guid, List<Field>> fieldSchemas)
@@ -15,52 +16,88 @@ public class ObjectTypeSafetyInterceptor : SaveChangesInterceptor
         _fieldSchemas = fieldSchemas;
     }
 
-    public ValueTask<InterceptionResult<Guid>> SavingChangesAsync(DbContextEventData eventData, InterceptionResult<Guid> result, CancellationToken cancellationToken = default)
+    public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
+        DbContextEventData eventData, 
+        InterceptionResult<int> result, 
+        CancellationToken cancellationToken = default)
     {
-        var entries = eventData.Context?.ChangeTracker.Entries<Collection>() ?? Enumerable.Empty<Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry<Collection>>();
-        foreach (var entry in entries) {
+        // Watch for changes on the Entry table
+        var entries = eventData.Context?.ChangeTracker.Entries<Entry>() 
+                      ?? Enumerable.Empty<Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry<Entry>>();
+
+        foreach (var entry in entries)
+        {
             if (entry.State == EntityState.Added || entry.State == EntityState.Modified)
             {
-                
+                ValidateObjectData(entry.Entity);
             }
         }
 
         return ValueTask.FromResult(result);
     }
 
-
     private void ValidateObjectData(Entry entry)
     {
+        // Access RootElement of the JsonDocument
         if (entry.Data.RootElement.ValueKind != JsonValueKind.Object)
         {
-            throw new InvalidOperationException($"Data for entry '{entry}' must be a JSON object.");
+            throw new DbUpdateException($"Data for entry '{entry.Id}' must be a valid JSON object.");
         }
 
+        // Look up schema using the Entry's CollectionId (Guid)
         if (!_fieldSchemas.TryGetValue(entry.CollectionId, out var fields))
         {
-            throw new InvalidOperationException($"No field schema found for collection ID '{entry.CollectionId}'.");
+            throw new DbUpdateException($"No field schema found for Collection ID '{entry.CollectionId}'.");
         }
 
         foreach (var jsonProp in entry.Data.RootElement.EnumerateObject())
         {
+            // Match against the Field entity's "Name" property (e.g., "title", "views")
             var fieldDef = fields.FirstOrDefault(f => f.Name == jsonProp.Name);
+            
             if (fieldDef == null)
             {
-                throw new InvalidOperationException($"Field '{jsonProp.Name}' is not defined in the schema for collection ID '{entry.CollectionId}'.");
+                throw new DbUpdateException(
+                    $"Field '{jsonProp.Name}' is not defined in the schema for Collection ID '{entry.CollectionId}'.");
             }
 
-            if (jsonProp.Value.ValueKind == JsonValueKind.Null && !fieldDef.IsRequired) continue;
+            // Allow nulls if the field isn't strictly required
+            if (jsonProp.Value.ValueKind == JsonValueKind.Null && !fieldDef.IsRequired) 
+                continue;
 
             bool isValid = fieldDef.DataType switch
             {
-                   FieldDataType.String => jsonProp.Value.ValueKind == JsonValueKind.String,
-                FieldDataType.Integer => jsonProp.Value.ValueKind == JsonValueKind.Number && jsonProp.Value.TryGetInt32(out _),
-                FieldDataType.Float => jsonProp.Value.ValueKind == JsonValueKind.Number,
-                FieldType.Boolean => jsonProp.Value.ValueKind == JsonValueKind.True || jsonProp.Value.ValueKind == JsonValueKind.False,
-                FieldType.DateTime => jsonProp.Value.ValueKind == JsonValueKind.String && DateTime.TryParse(jsonProp.Value.GetString(), out _),
-                _ => true
+                FieldDataType.Text or FieldDataType.RichText => jsonProp.Value.ValueKind == JsonValueKind.String,
+                
+                // Number supports both int and float in JSON
+                FieldDataType.Number => jsonProp.Value.ValueKind == JsonValueKind.Number && jsonProp.Value.TryGetDouble(out _),
+                
+                FieldDataType.Boolean => jsonProp.Value.ValueKind == JsonValueKind.True || jsonProp.Value.ValueKind == JsonValueKind.False,
+                
+                // DateTime must be a valid ISO string
+                FieldDataType.DateTime => jsonProp.Value.ValueKind == JsonValueKind.String && DateTime.TryParse(jsonProp.Value.GetString(), out _),
+                
+                // Relation stores a Guid string in the JSON
+                FieldDataType.Relation => jsonProp.Value.ValueKind == JsonValueKind.String && Guid.TryParse(jsonProp.Value.GetString(), out _),
+                
+                // TextList: Array of strings
+                FieldDataType.TextList => jsonProp.Value.ValueKind == JsonValueKind.Array && jsonProp.Value.EnumerateArray().All(x => x.ValueKind == JsonValueKind.String),
+                
+                // NumberList: Array of numbers
+                FieldDataType.NumberList => jsonProp.Value.ValueKind == JsonValueKind.Array && jsonProp.Value.EnumerateArray().All(x => x.ValueKind == JsonValueKind.Number),
+                
+                // Asset and Object: Must be a JSON object block
+                FieldDataType.Asset or FieldDataType.Object => jsonProp.Value.ValueKind == JsonValueKind.Object,
+                
+                _ => true 
             };
-            // Additional type checks can be implemented here based on field.Type
+
+            if (!isValid)
+            {
+                throw new DbUpdateException(
+                    $"Type violation in Entry '{entry.Id}' (Collection ID '{entry.CollectionId}'), Field '{fieldDef.Name}'. " +
+                    $"Expected JSON format for '{fieldDef.DataType}', but received '{jsonProp.Value.ValueKind}'.");
+            }
         }
     }
 }

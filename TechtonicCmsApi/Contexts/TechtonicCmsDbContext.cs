@@ -21,16 +21,8 @@ public class TechtonicCmsDbContext : DbContext
     public DbSet<Collection> Collections => Set<Collection>();
     public DbSet<Field> Fields => Set<Field>();
     public DbSet<Entry> Entries => Set<Entry>();
-    public DbSet<EntryRelation> EntryRelations => Set<EntryRelation>();
-    public DbSet<EntryTypstText> EntryTypstTexts => Set<EntryTypstText>();
-    public DbSet<EntryText> EntryTexts => Set<EntryText>();
-    public DbSet<EntryBoolean> EntryBooleans => Set<EntryBoolean>();
-    public DbSet<EntryNumber> EntryNumbers => Set<EntryNumber>();
-    public DbSet<EntryDateTime> EntryDateTimes => Set<EntryDateTime>();
-    public DbSet<EntryRichText> EntryRichTexts => Set<EntryRichText>();
-    public DbSet<EntryJsonData> EntryJsonData => Set<EntryJsonData>();
+
     public DbSet<Asset> Assets => Set<Asset>();
-    public DbSet<EntryAsset> EntryAssets => Set<EntryAsset>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -48,10 +40,7 @@ public class TechtonicCmsDbContext : DbContext
         ConfigureCollection(modelBuilder);
         ConfigureField(modelBuilder);
         ConfigureEntry(modelBuilder);
-        ConfigureEntryRelation(modelBuilder);
-        ConfigureEntryValueTables(modelBuilder);
         ConfigureAsset(modelBuilder);
-        ConfigureEntryAsset(modelBuilder);
     }
 
     private static void RegisterEnums(ModelBuilder modelBuilder)
@@ -66,7 +55,7 @@ public class TechtonicCmsDbContext : DbContext
         modelBuilder.HasPostgresEnum<LogicalOperator>();
         modelBuilder.HasPostgresEnum<EntryStatus>();
         modelBuilder.HasPostgresEnum<Locale>();
-        modelBuilder.HasPostgresEnum<DataType>();
+        modelBuilder.HasPostgresEnum<FieldDataType>();
     }
 
     private static void ConfigureUser(ModelBuilder modelBuilder)
@@ -185,7 +174,7 @@ public class TechtonicCmsDbContext : DbContext
             e.Property(a => a.Timestamp).HasDefaultValueSql("now()");
 
             e.HasOne(a => a.User).WithMany(u => u.AuditLogs).OnDelete(DeleteBehavior.Restrict);
-            e.HasOne(a => a.Field).WithMany(f => f.AuditLogs).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(a => a.Field).WithMany().OnDelete(DeleteBehavior.Restrict);
         });
     }
 
@@ -243,43 +232,8 @@ public class TechtonicCmsDbContext : DbContext
         });
     }
 
-    private static void ConfigureEntryRelation(ModelBuilder modelBuilder)
-    {
-        modelBuilder.Entity<EntryRelation>(e =>
-        {
-            e.HasOne(er => er.FromEntry)
-                .WithMany(en => en.FromRelations)
-                .HasForeignKey(er => er.FromEntryId)
-                .OnDelete(DeleteBehavior.Restrict);
+  
 
-            e.HasOne(er => er.ToEntry)
-                .WithMany(en => en.ToRelations)
-                .HasForeignKey(er => er.ToEntryId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            e.HasOne(er => er.Field)
-                .WithMany(f => f.EntryRelations)
-                .HasForeignKey(er => er.FieldId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            e.Property(er => er.CreatedAt).HasDefaultValueSql("now()");
-        });
-    }
-
-    private static void ConfigureEntryValueTables(ModelBuilder modelBuilder)
-    {
-        modelBuilder.Entity<EntryTypstText>(e => { e.Property(et => et.CreatedAt).HasDefaultValueSql("now()"); });
-        modelBuilder.Entity<EntryText>(e => { e.Property(et => et.CreatedAt).HasDefaultValueSql("now()"); });
-        modelBuilder.Entity<EntryBoolean>(e => { e.Property(eb => eb.CreatedAt).HasDefaultValueSql("now()"); });
-        modelBuilder.Entity<EntryNumber>(e => { e.Property(en => en.CreatedAt).HasDefaultValueSql("now()"); });
-        modelBuilder.Entity<EntryDateTime>(e => { e.Property(ed => ed.CreatedAt).HasDefaultValueSql("now()"); });
-        modelBuilder.Entity<EntryRichText>(e =>
-        {
-            e.Property(er => er.CreatedAt).HasDefaultValueSql("now()");
-            e.Property(er => er.Format).HasDefaultValue("markdown");
-        });
-        modelBuilder.Entity<EntryJsonData>(e => { e.Property(ej => ej.CreatedAt).HasDefaultValueSql("now()"); });
-    }
 
     private static void ConfigureAsset(ModelBuilder modelBuilder)
     {
@@ -295,12 +249,5 @@ public class TechtonicCmsDbContext : DbContext
         });
     }
 
-    private static void ConfigureEntryAsset(ModelBuilder modelBuilder)
-    {
-        modelBuilder.Entity<EntryAsset>(e =>
-        {
-            e.Property(ea => ea.SortOrder).HasDefaultValue(0);
-            e.Property(ea => ea.CreatedAt).HasDefaultValueSql("now()");
-        });
-    }
+
 }

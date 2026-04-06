@@ -35,5 +35,5 @@ public class Asset
     public required bool IsPublic { get; set; }
 
     public User UploadedByUser { get; set; } = null!;
-    public ICollection<EntryAsset> EntryAssets { get; set; } = new List<EntryAsset>();
+    public ICollection<Entry> Entries { get; set; } = new List<Entry>();
 }

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -14,8 +15,8 @@ namespace TechtonicCmsApi.Migrations
             migrationBuilder.AlterDatabase()
                 .Annotation("Npgsql:Enum:attribute_path", "subject_id,subject_role,subject_status,subject_created_at,resource_collection_id,resource_collection_slug,resource_collection_created_by,resource_collection_is_localized,resource_entry_id,resource_entry_status,resource_entry_created_by,resource_entry_collection_id,resource_entry_locale,resource_entry_published_at,resource_field_id,resource_field_name,resource_field_data_type,resource_field_sensitivity_level,resource_field_is_pii,resource_field_is_public,resource_field_collection_id,resource_asset_id,resource_asset_uploaded_by,resource_asset_mime_type,resource_asset_file_size,environment_current_time,environment_ip_address,environment_user_agent,action_type")
                 .Annotation("Npgsql:Enum:base_resource", "users,collections,entries,assets,fields")
-                .Annotation("Npgsql:Enum:data_type", "text,typst_text,boolean,number,date_time,relation,text_list,number_list,asset,rich_text,json")
                 .Annotation("Npgsql:Enum:entry_status", "draft,published,archived,deleted")
+                .Annotation("Npgsql:Enum:field_data_type", "text,boolean,number,date_time,relation,text_list,number_list,asset,rich_text,object")
                 .Annotation("Npgsql:Enum:locale", "en,es,fr,de,it,pt,ja,ko,zh,ar,ru")
                 .Annotation("Npgsql:Enum:logical_operator", "and,or")
                 .Annotation("Npgsql:Enum:operator_type", "eq,ne,in,not_in,gt,gte,lt,lte,contains,starts_with,ends_with,is_null,is_not_null,regex")
@@ -306,11 +307,18 @@ namespace TechtonicCmsApi.Migrations
                     Slug = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: true),
                     Status = table.Column<int>(type: "integer", nullable: false, defaultValue: 0),
                     Locale = table.Column<int>(type: "integer", nullable: false, defaultValue: 0),
-                    DefaultLocale = table.Column<int>(type: "integer", nullable: false, defaultValue: 0)
+                    DefaultLocale = table.Column<int>(type: "integer", nullable: false, defaultValue: 0),
+                    Data = table.Column<JsonDocument>(type: "jsonb", nullable: false),
+                    AssetId = table.Column<Guid>(type: "uuid", nullable: true)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_entries", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_entries_assets_AssetId",
+                        column: x => x.AssetId,
+                        principalTable: "assets",
+                        principalColumn: "Id");
                     table.ForeignKey(
                         name: "FK_entries_collections_CollectionId",
                         column: x => x.CollectionId,
@@ -334,7 +342,6 @@ namespace TechtonicCmsApi.Migrations
                     Name = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
                     Label = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: true),
                     Description = table.Column<string>(type: "text", nullable: true),
-                    DataType = table.Column<int>(type: "integer", nullable: false),
                     IsRequired = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false),
                     IsUnique = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false),
                     IsPublic = table.Column<bool>(type: "boolean", nullable: false, defaultValue: true),
@@ -346,7 +353,8 @@ namespace TechtonicCmsApi.Migrations
                     HelpText = table.Column<string>(type: "character varying(1024)", maxLength: 1024, nullable: true),
                     CreatedBy = table.Column<Guid>(type: "uuid", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
-                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
+                    DataType = table.Column<int>(type: "integer", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -433,265 +441,6 @@ namespace TechtonicCmsApi.Migrations
                         name: "FK_abac_evaluation_cache_users_UserId",
                         column: x => x.UserId,
                         principalTable: "users",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "entry_assets",
-                columns: table => new
-                {
-                    EntryId = table.Column<Guid>(type: "uuid", nullable: false),
-                    FieldId = table.Column<Guid>(type: "uuid", nullable: false),
-                    AssetId = table.Column<Guid>(type: "uuid", nullable: false),
-                    SortOrder = table.Column<int>(type: "integer", nullable: false, defaultValue: 0),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
-                    SearchHash = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_entry_assets", x => new { x.EntryId, x.FieldId, x.AssetId });
-                    table.ForeignKey(
-                        name: "FK_entry_assets_assets_AssetId",
-                        column: x => x.AssetId,
-                        principalTable: "assets",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_entry_assets_entries_EntryId",
-                        column: x => x.EntryId,
-                        principalTable: "entries",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_entry_assets_fields_FieldId",
-                        column: x => x.FieldId,
-                        principalTable: "fields",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "entry_booleans",
-                columns: table => new
-                {
-                    EntryId = table.Column<Guid>(type: "uuid", nullable: false),
-                    FieldId = table.Column<Guid>(type: "uuid", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
-                    Value = table.Column<bool>(type: "boolean", nullable: true),
-                    SearchHash = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_entry_booleans", x => new { x.EntryId, x.FieldId });
-                    table.ForeignKey(
-                        name: "FK_entry_booleans_entries_EntryId",
-                        column: x => x.EntryId,
-                        principalTable: "entries",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_entry_booleans_fields_FieldId",
-                        column: x => x.FieldId,
-                        principalTable: "fields",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "entry_datetimes",
-                columns: table => new
-                {
-                    EntryId = table.Column<Guid>(type: "uuid", nullable: false),
-                    FieldId = table.Column<Guid>(type: "uuid", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
-                    Value = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    SearchHash = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_entry_datetimes", x => new { x.EntryId, x.FieldId });
-                    table.ForeignKey(
-                        name: "FK_entry_datetimes_entries_EntryId",
-                        column: x => x.EntryId,
-                        principalTable: "entries",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_entry_datetimes_fields_FieldId",
-                        column: x => x.FieldId,
-                        principalTable: "fields",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "entry_json_data",
-                columns: table => new
-                {
-                    EntryId = table.Column<Guid>(type: "uuid", nullable: false),
-                    FieldId = table.Column<Guid>(type: "uuid", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
-                    Value = table.Column<string>(type: "text", nullable: false),
-                    ValueType = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
-                    SearchHash = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_entry_json_data", x => new { x.EntryId, x.FieldId });
-                    table.ForeignKey(
-                        name: "FK_entry_json_data_entries_EntryId",
-                        column: x => x.EntryId,
-                        principalTable: "entries",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_entry_json_data_fields_FieldId",
-                        column: x => x.FieldId,
-                        principalTable: "fields",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "entry_numbers",
-                columns: table => new
-                {
-                    EntryId = table.Column<Guid>(type: "uuid", nullable: false),
-                    FieldId = table.Column<Guid>(type: "uuid", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
-                    Value = table.Column<int>(type: "integer", nullable: true),
-                    SearchHash = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_entry_numbers", x => new { x.EntryId, x.FieldId });
-                    table.ForeignKey(
-                        name: "FK_entry_numbers_entries_EntryId",
-                        column: x => x.EntryId,
-                        principalTable: "entries",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_entry_numbers_fields_FieldId",
-                        column: x => x.FieldId,
-                        principalTable: "fields",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "entry_relations",
-                columns: table => new
-                {
-                    FromEntryId = table.Column<Guid>(type: "uuid", nullable: false),
-                    FieldId = table.Column<Guid>(type: "uuid", nullable: false),
-                    ToEntryId = table.Column<Guid>(type: "uuid", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_entry_relations", x => new { x.FromEntryId, x.FieldId, x.ToEntryId });
-                    table.ForeignKey(
-                        name: "FK_entry_relations_entries_FromEntryId",
-                        column: x => x.FromEntryId,
-                        principalTable: "entries",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_entry_relations_entries_ToEntryId",
-                        column: x => x.ToEntryId,
-                        principalTable: "entries",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_entry_relations_fields_FieldId",
-                        column: x => x.FieldId,
-                        principalTable: "fields",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "entry_rich_texts",
-                columns: table => new
-                {
-                    EntryId = table.Column<Guid>(type: "uuid", nullable: false),
-                    FieldId = table.Column<Guid>(type: "uuid", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
-                    Raw = table.Column<string>(type: "text", nullable: false),
-                    Rendered = table.Column<string>(type: "text", nullable: false),
-                    Format = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false, defaultValue: "markdown"),
-                    SearchHash = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_entry_rich_texts", x => new { x.EntryId, x.FieldId });
-                    table.ForeignKey(
-                        name: "FK_entry_rich_texts_entries_EntryId",
-                        column: x => x.EntryId,
-                        principalTable: "entries",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_entry_rich_texts_fields_FieldId",
-                        column: x => x.FieldId,
-                        principalTable: "fields",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "entry_texts",
-                columns: table => new
-                {
-                    EntryId = table.Column<Guid>(type: "uuid", nullable: false),
-                    FieldId = table.Column<Guid>(type: "uuid", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
-                    Value = table.Column<string>(type: "text", nullable: true),
-                    SearchHash = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_entry_texts", x => new { x.EntryId, x.FieldId });
-                    table.ForeignKey(
-                        name: "FK_entry_texts_entries_EntryId",
-                        column: x => x.EntryId,
-                        principalTable: "entries",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_entry_texts_fields_FieldId",
-                        column: x => x.FieldId,
-                        principalTable: "fields",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "entry_typst_texts",
-                columns: table => new
-                {
-                    EntryId = table.Column<Guid>(type: "uuid", nullable: false),
-                    FieldId = table.Column<Guid>(type: "uuid", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
-                    Raw = table.Column<string>(type: "text", nullable: false),
-                    Rendered = table.Column<string>(type: "text", nullable: false),
-                    SearchHash = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_entry_typst_texts", x => new { x.EntryId, x.FieldId });
-                    table.ForeignKey(
-                        name: "FK_entry_typst_texts_entries_EntryId",
-                        column: x => x.EntryId,
-                        principalTable: "entries",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_entry_typst_texts_fields_FieldId",
-                        column: x => x.FieldId,
-                        principalTable: "fields",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -814,6 +563,11 @@ namespace TechtonicCmsApi.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_entries_AssetId",
+                table: "entries",
+                column: "AssetId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_entries_CollectionId",
                 table: "entries",
                 column: "CollectionId");
@@ -822,61 +576,6 @@ namespace TechtonicCmsApi.Migrations
                 name: "IX_entries_CreatedBy",
                 table: "entries",
                 column: "CreatedBy");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_entry_assets_AssetId",
-                table: "entry_assets",
-                column: "AssetId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_entry_assets_FieldId",
-                table: "entry_assets",
-                column: "FieldId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_entry_booleans_FieldId",
-                table: "entry_booleans",
-                column: "FieldId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_entry_datetimes_FieldId",
-                table: "entry_datetimes",
-                column: "FieldId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_entry_json_data_FieldId",
-                table: "entry_json_data",
-                column: "FieldId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_entry_numbers_FieldId",
-                table: "entry_numbers",
-                column: "FieldId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_entry_relations_FieldId",
-                table: "entry_relations",
-                column: "FieldId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_entry_relations_ToEntryId",
-                table: "entry_relations",
-                column: "ToEntryId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_entry_rich_texts_FieldId",
-                table: "entry_rich_texts",
-                column: "FieldId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_entry_texts_FieldId",
-                table: "entry_texts",
-                column: "FieldId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_entry_typst_texts_FieldId",
-                table: "entry_typst_texts",
-                column: "FieldId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_fields_CollectionId_Name",
@@ -977,11 +676,44 @@ namespace TechtonicCmsApi.Migrations
                 table: "user_roles",
                 columns: new[] { "UserId", "RoleId" },
                 unique: true);
+
+            // CMS JSONB extraction functions for querying dynamic field values.
+            // Each function extracts a typed value from a JSONB document by key.
+            // IMMUTABLE = same inputs always produce same output (required for expression indexes).
+            // STRICT = returns NULL automatically if any input is NULL (handles missing keys).
+            migrationBuilder.Sql("""
+                CREATE FUNCTION cms_extract_text(doc jsonb, key text) RETURNS text
+                  LANGUAGE SQL IMMUTABLE STRICT AS $$
+                    SELECT doc->>key;
+                  $$;
+
+                CREATE FUNCTION cms_extract_number(doc jsonb, key text) RETURNS numeric
+                  LANGUAGE SQL IMMUTABLE STRICT AS $$
+                    SELECT (doc->>key)::numeric;
+                  $$;
+
+                CREATE FUNCTION cms_extract_boolean(doc jsonb, key text) RETURNS boolean
+                  LANGUAGE SQL IMMUTABLE STRICT AS $$
+                    SELECT (doc->>key)::boolean;
+                  $$;
+
+                CREATE FUNCTION cms_extract_datetime(doc jsonb, key text) RETURNS timestamptz
+                  LANGUAGE SQL IMMUTABLE STRICT AS $$
+                    SELECT (doc->>key)::timestamptz;
+                  $$;
+                """);
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.Sql("""
+                DROP FUNCTION IF EXISTS cms_extract_text(jsonb, text);
+                DROP FUNCTION IF EXISTS cms_extract_number(jsonb, text);
+                DROP FUNCTION IF EXISTS cms_extract_boolean(jsonb, text);
+                DROP FUNCTION IF EXISTS cms_extract_datetime(jsonb, text);
+                """);
+
             migrationBuilder.DropTable(
                 name: "abac_audit");
 
@@ -992,31 +724,7 @@ namespace TechtonicCmsApi.Migrations
                 name: "abac_policy_rules");
 
             migrationBuilder.DropTable(
-                name: "entry_assets");
-
-            migrationBuilder.DropTable(
-                name: "entry_booleans");
-
-            migrationBuilder.DropTable(
-                name: "entry_datetimes");
-
-            migrationBuilder.DropTable(
-                name: "entry_json_data");
-
-            migrationBuilder.DropTable(
-                name: "entry_numbers");
-
-            migrationBuilder.DropTable(
-                name: "entry_relations");
-
-            migrationBuilder.DropTable(
-                name: "entry_rich_texts");
-
-            migrationBuilder.DropTable(
-                name: "entry_texts");
-
-            migrationBuilder.DropTable(
-                name: "entry_typst_texts");
+                name: "entries");
 
             migrationBuilder.DropTable(
                 name: "resource_ownerships");
@@ -1031,13 +739,10 @@ namespace TechtonicCmsApi.Migrations
                 name: "user_roles");
 
             migrationBuilder.DropTable(
-                name: "assets");
-
-            migrationBuilder.DropTable(
-                name: "entries");
-
-            migrationBuilder.DropTable(
                 name: "fields");
+
+            migrationBuilder.DropTable(
+                name: "assets");
 
             migrationBuilder.DropTable(
                 name: "abac_policies");

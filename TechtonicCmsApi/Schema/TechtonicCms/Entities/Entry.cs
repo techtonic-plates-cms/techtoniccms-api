@@ -37,7 +37,7 @@ public class Entry
 
     public required JsonDocument Data { get; set; }
 
-    public void Dispoe()
+    public void Dispose()
     {
         Data.Dispose();
     }

@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using TechtonicCmsApi.Contexts;
 using TechtonicCmsApi.Schema.TechtonicCms.Entities;
 using TechtonicCmsApi.Schema.TechtonicCms.Enums;
+using TechtonicCmsApi.Types.Collections.DynamicCollections;
 
 namespace TechtonicCmsApi.Types.Collections;
 
@@ -127,7 +128,8 @@ public class CollectionMutation
     public async Task<Collection> Create(
         CreateCollectionInput input,
         [Service] TechtonicCmsDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] CollectionTypeModule typeModule)
     {
         var userId = GetUserId(httpContextAccessor);
 
@@ -208,6 +210,8 @@ public class CollectionMutation
             await db.SaveChangesAsync();
         }
 
+        typeModule.TriggerTypesChanged();
+
         return collection;
     }
 
@@ -215,7 +219,8 @@ public class CollectionMutation
     public async Task<Collection> Update(
         UpdateCollectionInput input,
         [Service] TechtonicCmsDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] CollectionTypeModule typeModule)
     {
         var userId = GetUserId(httpContextAccessor);
 
@@ -364,13 +369,16 @@ public class CollectionMutation
         collection.UpdatedAt = now;
         await db.SaveChangesAsync();
 
+        typeModule.TriggerTypesChanged();
+
         return collection;
     }
 
     [Authorize]
     public async Task<bool> Delete(
         Guid id,
-        [Service] TechtonicCmsDbContext db)
+        [Service] TechtonicCmsDbContext db,
+        [Service] CollectionTypeModule typeModule)
     {
         var collection = await db.Collections.FindAsync(id);
         if (collection is null)
@@ -388,6 +396,8 @@ public class CollectionMutation
 
         db.Collections.Remove(collection);
         await db.SaveChangesAsync();
+
+        typeModule.TriggerTypesChanged();
 
         return true;
     }

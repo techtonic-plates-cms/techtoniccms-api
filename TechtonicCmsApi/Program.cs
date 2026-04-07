@@ -6,6 +6,7 @@ using TechtonicCmsApi.Schema.TechtonicCms;
 using TechtonicCmsApi.Security;
 using TechtonicCmsApi.Services;
 using TechtonicCmsApi.Types.Assets;
+using TechtonicCmsApi.Types.Collections.DynamicCollections;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,6 +18,7 @@ builder.Services.AddDbContext<TechtonicCmsDbContext>(options =>
     options.UseNpgsql(connectionString));
 
 builder.Services.AddSingleton<RedisService>();
+builder.Services.AddSingleton<CollectionTypeModule>();
 builder.Services.AddScoped<SessionService>();
 builder.Services.AddScoped<PasswordService>();
 builder.Services.AddScoped<AuthService>();
@@ -76,6 +78,7 @@ builder.AddGraphQL()
     {
         options.IncludeExceptionDetails = builder.Environment.IsDevelopment();
     })
+    .AddTypeModule<CollectionTypeModule>()
     .AddTypes();
 
 var app = builder.Build();

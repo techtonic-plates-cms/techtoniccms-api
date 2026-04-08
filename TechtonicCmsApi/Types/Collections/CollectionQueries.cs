@@ -10,7 +10,7 @@ namespace TechtonicCmsApi.Types.Collections;
 
 public class CollectionQuery
 {
- /*   [Authorize]
+    [Authorize]
     public async Task<Collection?> Collection(
         Guid? id,
         string? slug,
@@ -54,7 +54,7 @@ public class CollectionQuery
             query = query.Take(limit.Value);
 
         return await query.OrderBy(c => c.Name).ToListAsync();
-    }*/
+    }
 }
 
 [ExtendObjectType(nameof(Query))]

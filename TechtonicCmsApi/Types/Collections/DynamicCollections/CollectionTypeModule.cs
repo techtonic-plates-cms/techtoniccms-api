@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using HotChocolate;
@@ -10,6 +11,7 @@ using HotChocolate.Types.Descriptors.Definitions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using TechtonicCmsApi.Contexts;
+using TechtonicCmsApi.Schema.TechtonicCms.Entities;
 using TechtonicCmsApi.Schema.TechtonicCms.Enums;
 
 namespace TechtonicCmsApi.Types.Collections.DynamicCollections;
@@ -53,19 +55,19 @@ public class CollectionTypeModule : TypeModule
             var pascalName = ToPascalCase(collection.Slug);
             var camelName = ToCamelCase(collection.Slug);
             var typeName = $"{pascalName}Entry";
+            var dataTypeName = $"{pascalName}EntryData";
+            var collectionId = collection.Id;
 
-            var entryTypeDef = new ObjectTypeDefinition(typeName)
+            var dataTypeDef = new ObjectTypeDefinition(dataTypeName)
             {
-                Description = $"Dynamic entry type for the '{collection.Name}' collection",
+                Description = $"Dynamic data type for the '{collection.Name}' collection",
                 RuntimeType = typeof(Dictionary<string, object>)
             };
-
-            AddMetadataFields(entryTypeDef);
 
             foreach (var field in collection.Fields.OrderBy(f => f.CreatedAt))
             {
                 var graphqlType = MapFieldType(field.DataType);
-                entryTypeDef.Fields.Add(new ObjectFieldDefinition(
+                dataTypeDef.Fields.Add(new ObjectFieldDefinition(
                     field.Name,
                     field.Description,
                     TypeReference.Parse(graphqlType),
@@ -73,14 +75,104 @@ public class CollectionTypeModule : TypeModule
                         ctx.Parent<Dictionary<string, object>>().GetValueOrDefault(field.Name)));
             }
 
+            types.Add(ObjectType.CreateUnsafe(dataTypeDef));
+
+            var entryTypeDef = new ObjectTypeDefinition(typeName)
+            {
+                Description = $"Dynamic entry type for the '{collection.Name}' collection",
+                RuntimeType = typeof(Entry)
+            };
+
+            entryTypeDef.Fields.Add(new ObjectFieldDefinition(
+                        "id",
+                        "Unique identifier",
+                        TypeReference.Parse("ID!"),
+                        pureResolver: ctx => ctx.Parent<Entry>().Id));
+
+            entryTypeDef.Fields.Add(new ObjectFieldDefinition(
+                "name",
+                "Entry name",
+                TypeReference.Parse("String!"),
+                pureResolver: ctx => ctx.Parent<Entry>().Name));
+
+            entryTypeDef.Fields.Add(new ObjectFieldDefinition(
+                "slug",
+                "URL-friendly identifier",
+                TypeReference.Parse("String"),
+                pureResolver: ctx =>
+                    ctx.Parent<Entry>().Slug));
+
+            entryTypeDef.Fields.Add(new ObjectFieldDefinition(
+                "status",
+                "Entry status",
+                TypeReference.Parse("String!"),
+                pureResolver: ctx => ctx.Parent<Entry>().Status));
+
+            entryTypeDef.Fields.Add(new ObjectFieldDefinition(
+                "createdAt",
+                "Creation timestamp",
+                TypeReference.Parse("DateTime!"),
+                pureResolver: ctx => ctx.Parent<Entry>().CreatedAt));
+
+            entryTypeDef.Fields.Add(new ObjectFieldDefinition(
+                "updatedAt",
+                "Last update timestamp",
+                TypeReference.Parse("DateTime!"),
+                pureResolver: ctx => ctx.Parent<Entry>().UpdatedAt));
+
+            entryTypeDef.Fields.Add(new ObjectFieldDefinition(
+                "publishedAt",
+                "Publication timestamp",
+                TypeReference.Parse("DateTime"),
+                pureResolver: ctx =>
+                    ctx.Parent<Entry>().PublishedAt));
+
+
+            entryTypeDef.Fields.Add(new ObjectFieldDefinition(
+                "data",
+                $"Dynamic data for the '{collection.Name}' collection",
+                TypeReference.Parse($"{dataTypeName}!"),
+                resolver: _ =>
+                {
+                    var entry = _.Parent<Entry>();
+                    var dict = JsonSerializer.Deserialize<Dictionary<string, object>>(entry.Data.RootElement.GetRawText(), new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    return new ValueTask<object?>(dict ?? new Dictionary<string, object>());
+                }
+            ));
+
             types.Add(ObjectType.CreateUnsafe(entryTypeDef));
 
             queryExtensionDef.Fields.Add(new ObjectFieldDefinition(
                 camelName,
                 $"Access entries from the '{collection.Name}' collection",
                 TypeReference.Parse($"[{typeName}]"),
-                resolver: _ =>
-                    new ValueTask<object?>((object)new List<Dictionary<string, object>>())));
+                resolver: async _ =>
+                {
+                    var innerScope = _scopeFactory.CreateScope();
+                    try
+                    {
+                        var innerDb = innerScope.ServiceProvider.GetRequiredService<TechtonicCmsDbContext>();
+                        var entries = from e in innerDb.Entries
+                                      where e.CollectionId == collectionId
+                                      orderby e.CreatedAt descending
+                                      select e;
+                        foreach (var entry in entries)
+                        {
+                            innerDb.Entry(entry).State = EntityState.Detached;
+                        }
+
+                        var es = await entries.ToListAsync(_.RequestAborted);
+
+                        return es;
+                    }
+                    finally
+                    {
+                        innerScope.Dispose();
+                    }
+                }));
+
+
+
         }
 
         types.Add(ObjectTypeExtension.CreateUnsafe(queryExtensionDef));
@@ -90,49 +182,7 @@ public class CollectionTypeModule : TypeModule
 
     private static void AddMetadataFields(ObjectTypeDefinition typeDef)
     {
-        typeDef.Fields.Add(new ObjectFieldDefinition(
-            "id",
-            "Unique identifier",
-            TypeReference.Parse("ID!"),
-            pureResolver: ctx => ctx.Parent<Dictionary<string, object>>()["id"]));
 
-        typeDef.Fields.Add(new ObjectFieldDefinition(
-            "name",
-            "Entry name",
-            TypeReference.Parse("String!"),
-            pureResolver: ctx => ctx.Parent<Dictionary<string, object>>()["name"]));
-
-        typeDef.Fields.Add(new ObjectFieldDefinition(
-            "slug",
-            "URL-friendly identifier",
-            TypeReference.Parse("String"),
-            pureResolver: ctx =>
-                ctx.Parent<Dictionary<string, object>>().GetValueOrDefault("slug")));
-
-        typeDef.Fields.Add(new ObjectFieldDefinition(
-            "status",
-            "Entry status",
-            TypeReference.Parse("String!"),
-            pureResolver: ctx => ctx.Parent<Dictionary<string, object>>()["status"]));
-
-        typeDef.Fields.Add(new ObjectFieldDefinition(
-            "createdAt",
-            "Creation timestamp",
-            TypeReference.Parse("DateTime!"),
-            pureResolver: ctx => ctx.Parent<Dictionary<string, object>>()["createdAt"]));
-
-        typeDef.Fields.Add(new ObjectFieldDefinition(
-            "updatedAt",
-            "Last update timestamp",
-            TypeReference.Parse("DateTime!"),
-            pureResolver: ctx => ctx.Parent<Dictionary<string, object>>()["updatedAt"]));
-
-        typeDef.Fields.Add(new ObjectFieldDefinition(
-            "publishedAt",
-            "Publication timestamp",
-            TypeReference.Parse("DateTime"),
-            pureResolver: ctx =>
-                ctx.Parent<Dictionary<string, object>>().GetValueOrDefault("publishedAt")));
     }
 
     private static string MapFieldType(FieldDataType dataType) => dataType switch

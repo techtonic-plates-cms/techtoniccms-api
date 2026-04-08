@@ -13,7 +13,7 @@ namespace TechtonicCmsApi.Types.Collections;
 public class CollectionQuery
 {
     [Authorize(Policy = "Collections:Read")]
-    public async Task<Collection?> Collection(
+    public async Task<Collection?> CollectionData(
         Guid? id,
         string? slug,
         [Service] TechtonicCmsDbContext db,
@@ -43,7 +43,7 @@ public class CollectionQuery
     [UsePaging(MaxPageSize = 100)]
     [UseFiltering]
     [UseSorting]
-    public async Task<IEnumerable<Collection>> Collections(
+    public async Task<IEnumerable<Collection>> CollectionsData(
         string? search,
         int? limit,
         int? offset,

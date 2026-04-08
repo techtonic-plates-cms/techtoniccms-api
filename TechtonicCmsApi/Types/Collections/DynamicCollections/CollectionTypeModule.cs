@@ -50,6 +50,14 @@ public class CollectionTypeModule : TypeModule
             IsExtension = true
         };
 
+        var dynamicCollectionsTypeDef = new ObjectTypeDefinition("DynamicCollections")
+        {
+            Description = "Root type for all dynamic collections",
+            RuntimeType = typeof(Dictionary<string, object>)
+        };
+
+        types.Add(ObjectType.CreateUnsafe(dynamicCollectionsTypeDef));
+
         foreach (var collection in collections)
         {
             var pascalName = ToPascalCase(collection.Slug);
@@ -142,7 +150,7 @@ public class CollectionTypeModule : TypeModule
 
             types.Add(ObjectType.CreateUnsafe(entryTypeDef));
 
-            queryExtensionDef.Fields.Add(new ObjectFieldDefinition(
+            dynamicCollectionsTypeDef.Fields.Add(new ObjectFieldDefinition(
                 camelName,
                 $"Access entries from the '{collection.Name}' collection",
                 TypeReference.Parse($"[{typeName}]"),
@@ -174,6 +182,13 @@ public class CollectionTypeModule : TypeModule
 
 
         }
+
+        queryExtensionDef.Fields.Add(new ObjectFieldDefinition(
+            "dynamicCollections",
+            "List of all dynamic collections",
+            TypeReference.Parse("DynamicCollections!"),
+            resolver: _ => new ValueTask<object?>(new[] { new Dictionary<string, object>() })
+        ));
 
         types.Add(ObjectTypeExtension.CreateUnsafe(queryExtensionDef));
 

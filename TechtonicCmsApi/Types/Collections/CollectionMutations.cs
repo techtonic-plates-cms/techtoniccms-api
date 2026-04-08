@@ -20,8 +20,7 @@ public class FieldDefinitionInput
 
     public string? Description { get; set; }
 
-    [GraphQLType<NonNullType<StringType>>]
-    public string DataType { get; set; } = "";
+    public FieldDataType DataType { get; set; }
 
     public bool? IsRequired { get; set; }
 
@@ -53,7 +52,7 @@ public class FieldUpdateDefinitionInput
 
     public string? Description { get; set; }
 
-    public string? DataType { get; set; }
+    public FieldDataType? DataType { get; set; }
 
     public bool? IsRequired { get; set; }
 
@@ -181,12 +180,6 @@ public class CollectionMutation
                         .SetCode("BAD_REQUEST")
                         .Build());
 
-                if (!Enum.TryParse<FieldDataType>(fieldInput.DataType, true, out var dataType))
-                    throw new GraphQLException(ErrorBuilder.New()
-                        .SetMessage($"Invalid field data type: {fieldInput.DataType}")
-                        .SetCode("INVALID_ENUM")
-                        .Build());
-
                 db.Fields.Add(new Field
                 {
                     Id = Guid.NewGuid(),
@@ -194,7 +187,7 @@ public class CollectionMutation
                     Name = fieldInput.Name,
                     Label = fieldInput.Label,
                     Description = fieldInput.Description,
-                    DataType = dataType,
+                    DataType = fieldInput.DataType,
                     IsRequired = fieldInput.IsRequired ?? false,
                     IsUnique = fieldInput.IsUnique ?? false,
                     IsPublic = fieldInput.IsPublic ?? true,
@@ -309,16 +302,8 @@ public class CollectionMutation
                     existing.Label = fieldInput.Label;
                     existing.Description = fieldInput.Description;
 
-                    if (fieldInput.DataType is not null)
-                    {
-                        if (!Enum.TryParse<FieldDataType>(fieldInput.DataType, true, out var dataType))
-                            throw new GraphQLException(ErrorBuilder.New()
-                                .SetMessage($"Invalid field data type: {fieldInput.DataType}")
-                                .SetCode("INVALID_ENUM")
-                                .Build());
-
-                        existing.DataType = dataType;
-                    }
+                    if (fieldInput.DataType.HasValue)
+                        existing.DataType = fieldInput.DataType.Value;
 
                     if (fieldInput.IsRequired.HasValue) existing.IsRequired = fieldInput.IsRequired.Value;
                     if (fieldInput.IsUnique.HasValue) existing.IsUnique = fieldInput.IsUnique.Value;
@@ -334,10 +319,10 @@ public class CollectionMutation
                 }
                 else
                 {
-                    if (!Enum.TryParse<FieldDataType>(fieldInput.DataType, true, out var dataType))
+                    if (!fieldInput.DataType.HasValue)
                         throw new GraphQLException(ErrorBuilder.New()
-                            .SetMessage($"Invalid field data type: {fieldInput.DataType}")
-                            .SetCode("INVALID_ENUM")
+                            .SetMessage("DataType is required when creating a new field")
+                            .SetCode("BAD_REQUEST")
                             .Build());
 
                     var nameConflict = await db.Fields.AnyAsync(f =>
@@ -356,7 +341,7 @@ public class CollectionMutation
                         Name = fieldInput.Name,
                         Label = fieldInput.Label,
                         Description = fieldInput.Description,
-                        DataType = dataType,
+                        DataType = fieldInput.DataType.Value,
                         IsRequired = fieldInput.IsRequired ?? false,
                         IsUnique = fieldInput.IsUnique ?? false,
                         IsPublic = fieldInput.IsPublic ?? true,

@@ -43,6 +43,17 @@ public static partial class FieldType
 
     public static string? GetHelpText([Parent] Field field) => field.HelpText;
 
+    public static string? GetRelatedCollectionId([Parent] Field field) =>
+        field.RelatedCollectionId?.ToString();
+
+    public static async Task<Collection?> GetRelatedCollection(
+        [Parent] Field field,
+        [Service] TechtonicCmsDbContext db)
+    {
+        if (field.RelatedCollectionId is null) return null;
+        return await db.Collections.FindAsync(field.RelatedCollectionId.Value);
+    }
+
     public static string? GetCreatedAt([Parent] Field field) =>
         field.CreatedAt.ToUniversalTime().ToString("o");
 

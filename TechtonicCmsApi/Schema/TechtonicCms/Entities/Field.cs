@@ -55,6 +55,13 @@ public class Field
 
     public required FieldDataType DataType { get; set; }
 
+    /// <summary>
+    /// For Relation fields, the ID of the collection this field references.
+    /// </summary>
+    public Guid? RelatedCollectionId { get; set; }
+
+    public Collection? RelatedCollection { get; set; }
+
     /* public ICollection<EntryRelation> EntryRelations { get; set; } = new List<EntryRelation>();
      public ICollection<EntryTypstText> EntryTypstTexts { get; set; } = new List<EntryTypstText>();
      public ICollection<EntryText> EntryTexts { get; set; } = new List<EntryText>();

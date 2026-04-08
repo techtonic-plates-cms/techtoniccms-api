@@ -212,6 +212,11 @@ public class TechtonicCmsDbContext : DbContext
             e.HasOne(f => f.CreatedByUser)
                 .WithMany(u => u.CreatedFields)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasOne(f => f.RelatedCollection)
+                .WithMany()
+                .HasForeignKey(f => f.RelatedCollectionId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 

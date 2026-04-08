@@ -39,6 +39,9 @@ public class FieldDefinitionInput
     public string? DefaultValue { get; set; }
 
     public string? HelpText { get; set; }
+
+    [GraphQLType<IdType>]
+    public Guid? RelatedCollectionId { get; set; }
 }
 
 public class FieldUpdateDefinitionInput
@@ -71,6 +74,9 @@ public class FieldUpdateDefinitionInput
     public string? DefaultValue { get; set; }
 
     public string? HelpText { get; set; }
+
+    [GraphQLType<IdType>]
+    public Guid? RelatedCollectionId { get; set; }
 }
 
 public class CreateCollectionInput
@@ -180,6 +186,29 @@ public class CollectionMutation
                         .SetCode("BAD_REQUEST")
                         .Build());
 
+                if (fieldInput.DataType == FieldDataType.Relation)
+                {
+                    if (!fieldInput.RelatedCollectionId.HasValue)
+                        throw new GraphQLException(ErrorBuilder.New()
+                            .SetMessage("RelatedCollectionId is required for Relation fields")
+                            .SetCode("BAD_REQUEST")
+                            .Build());
+
+                    var relatedExists = await db.Collections.AnyAsync(c => c.Id == fieldInput.RelatedCollectionId.Value);
+                    if (!relatedExists)
+                        throw new GraphQLException(ErrorBuilder.New()
+                            .SetMessage($"Referenced collection '{fieldInput.RelatedCollectionId.Value}' not found")
+                            .SetCode("NOT_FOUND")
+                            .Build());
+                }
+                else if (fieldInput.RelatedCollectionId.HasValue)
+                {
+                    throw new GraphQLException(ErrorBuilder.New()
+                        .SetMessage("RelatedCollectionId can only be set for Relation fields")
+                        .SetCode("BAD_REQUEST")
+                        .Build());
+                }
+
                 db.Fields.Add(new Field
                 {
                     Id = Guid.NewGuid(),
@@ -197,6 +226,9 @@ public class CollectionMutation
                     ValidationRules = fieldInput.ValidationRules,
                     DefaultValue = fieldInput.DefaultValue,
                     HelpText = fieldInput.HelpText,
+                    RelatedCollectionId = fieldInput.DataType == FieldDataType.Relation
+                        ? fieldInput.RelatedCollectionId
+                        : null,
                     CreatedBy = userId,
                     CreatedAt = now,
                     UpdatedAt = now
@@ -305,6 +337,39 @@ public class CollectionMutation
                     if (fieldInput.DataType.HasValue)
                         existing.DataType = fieldInput.DataType.Value;
 
+                    var effectiveDataType = fieldInput.DataType ?? existing.DataType;
+
+                    if (effectiveDataType == FieldDataType.Relation)
+                    {
+                        if (!fieldInput.RelatedCollectionId.HasValue && !existing.RelatedCollectionId.HasValue)
+                            throw new GraphQLException(ErrorBuilder.New()
+                                .SetMessage("RelatedCollectionId is required for Relation fields")
+                                .SetCode("BAD_REQUEST")
+                                .Build());
+
+                        if (fieldInput.RelatedCollectionId.HasValue)
+                        {
+                            var relatedExists = await db.Collections.AnyAsync(c => c.Id == fieldInput.RelatedCollectionId.Value);
+                            if (!relatedExists)
+                                throw new GraphQLException(ErrorBuilder.New()
+                                    .SetMessage($"Referenced collection '{fieldInput.RelatedCollectionId.Value}' not found")
+                                    .SetCode("NOT_FOUND")
+                                    .Build());
+
+                            existing.RelatedCollectionId = fieldInput.RelatedCollectionId.Value;
+                        }
+                    }
+                    else
+                    {
+                        if (fieldInput.RelatedCollectionId.HasValue)
+                            throw new GraphQLException(ErrorBuilder.New()
+                                .SetMessage("RelatedCollectionId can only be set for Relation fields")
+                                .SetCode("BAD_REQUEST")
+                                .Build());
+
+                        existing.RelatedCollectionId = null;
+                    }
+
                     if (fieldInput.IsRequired.HasValue) existing.IsRequired = fieldInput.IsRequired.Value;
                     if (fieldInput.IsUnique.HasValue) existing.IsUnique = fieldInput.IsUnique.Value;
                     if (fieldInput.IsPublic.HasValue) existing.IsPublic = fieldInput.IsPublic.Value;
@@ -324,6 +389,29 @@ public class CollectionMutation
                             .SetMessage("DataType is required when creating a new field")
                             .SetCode("BAD_REQUEST")
                             .Build());
+
+                    if (fieldInput.DataType.Value == FieldDataType.Relation)
+                    {
+                        if (!fieldInput.RelatedCollectionId.HasValue)
+                            throw new GraphQLException(ErrorBuilder.New()
+                                .SetMessage("RelatedCollectionId is required for Relation fields")
+                                .SetCode("BAD_REQUEST")
+                                .Build());
+
+                        var relatedExists = await db.Collections.AnyAsync(c => c.Id == fieldInput.RelatedCollectionId.Value);
+                        if (!relatedExists)
+                            throw new GraphQLException(ErrorBuilder.New()
+                                .SetMessage($"Referenced collection '{fieldInput.RelatedCollectionId.Value}' not found")
+                                .SetCode("NOT_FOUND")
+                                .Build());
+                    }
+                    else if (fieldInput.RelatedCollectionId.HasValue)
+                    {
+                        throw new GraphQLException(ErrorBuilder.New()
+                            .SetMessage("RelatedCollectionId can only be set for Relation fields")
+                            .SetCode("BAD_REQUEST")
+                            .Build());
+                    }
 
                     var nameConflict = await db.Fields.AnyAsync(f =>
                         f.CollectionId == collection.Id && f.Name == fieldInput.Name);
@@ -351,6 +439,9 @@ public class CollectionMutation
                         ValidationRules = fieldInput.ValidationRules,
                         DefaultValue = fieldInput.DefaultValue,
                         HelpText = fieldInput.HelpText,
+                        RelatedCollectionId = fieldInput.DataType.Value == FieldDataType.Relation
+                            ? fieldInput.RelatedCollectionId
+                            : null,
                         CreatedBy = userId,
                         CreatedAt = now,
                         UpdatedAt = now

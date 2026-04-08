@@ -354,7 +354,8 @@ namespace TechtonicCmsApi.Migrations
                     CreatedBy = table.Column<Guid>(type: "uuid", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
-                    DataType = table.Column<int>(type: "integer", nullable: false)
+                    DataType = table.Column<int>(type: "integer", nullable: false),
+                    RelatedCollectionId = table.Column<Guid>(type: "uuid", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -365,6 +366,12 @@ namespace TechtonicCmsApi.Migrations
                         principalTable: "collections",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_fields_collections_RelatedCollectionId",
+                        column: x => x.RelatedCollectionId,
+                        principalTable: "collections",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "FK_fields_users_CreatedBy",
                         column: x => x.CreatedBy,
@@ -594,6 +601,11 @@ namespace TechtonicCmsApi.Migrations
                 column: "IsPii");
 
             migrationBuilder.CreateIndex(
+                name: "IX_fields_RelatedCollectionId",
+                table: "fields",
+                column: "RelatedCollectionId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_fields_SensitivityLevel",
                 table: "fields",
                 column: "SensitivityLevel");
@@ -676,7 +688,6 @@ namespace TechtonicCmsApi.Migrations
                 table: "user_roles",
                 columns: new[] { "UserId", "RoleId" },
                 unique: true);
-
             // CMS JSONB extraction functions for querying dynamic field values.
             // Each function extracts a typed value from a JSONB document by key.
             // IMMUTABLE = same inputs always produce same output (required for expression indexes).
@@ -713,7 +724,6 @@ namespace TechtonicCmsApi.Migrations
                 DROP FUNCTION IF EXISTS cms_extract_boolean(jsonb, text);
                 DROP FUNCTION IF EXISTS cms_extract_datetime(jsonb, text);
                 """);
-
             migrationBuilder.DropTable(
                 name: "abac_audit");
 

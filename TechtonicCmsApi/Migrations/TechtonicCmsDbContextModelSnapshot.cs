@@ -24,7 +24,7 @@ namespace TechtonicCmsApi.Migrations
             NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "attribute_path", new[] { "subject_id", "subject_role", "subject_status", "subject_created_at", "resource_collection_id", "resource_collection_slug", "resource_collection_created_by", "resource_collection_is_localized", "resource_entry_id", "resource_entry_status", "resource_entry_created_by", "resource_entry_collection_id", "resource_entry_locale", "resource_entry_published_at", "resource_field_id", "resource_field_name", "resource_field_data_type", "resource_field_sensitivity_level", "resource_field_is_pii", "resource_field_is_public", "resource_field_collection_id", "resource_asset_id", "resource_asset_uploaded_by", "resource_asset_mime_type", "resource_asset_file_size", "environment_current_time", "environment_ip_address", "environment_user_agent", "action_type" });
             NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "base_resource", new[] { "users", "collections", "entries", "assets", "fields" });
             NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "entry_status", new[] { "draft", "published", "archived", "deleted" });
-            NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "field_data_type", new[] { "text", "boolean", "number", "date_time", "relation", "text_list", "number_list", "asset", "rich_text", "object" });
+            NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "field_data_type", new[] { "text", "boolean", "number", "date_time", "relation", "asset", "object" });
             NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "locale", new[] { "en", "es", "fr", "de", "it", "pt", "ja", "ko", "zh", "ar", "ru" });
             NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "logical_operator", new[] { "and", "or" });
             NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "operator_type", new[] { "eq", "ne", "in", "not_in", "gt", "gte", "lt", "lte", "contains", "starts_with", "ends_with", "is_null", "is_not_null", "regex" });
@@ -554,6 +554,9 @@ namespace TechtonicCmsApi.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
 
+                    b.Property<Guid?>("RelatedCollectionId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("SensitivityLevel")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -574,6 +577,8 @@ namespace TechtonicCmsApi.Migrations
                     b.HasIndex("CreatedBy");
 
                     b.HasIndex("IsPii");
+
+                    b.HasIndex("RelatedCollectionId");
 
                     b.HasIndex("SensitivityLevel");
 
@@ -937,9 +942,16 @@ namespace TechtonicCmsApi.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("TechtonicCmsApi.Schema.TechtonicCms.Entities.Collection", "RelatedCollection")
+                        .WithMany()
+                        .HasForeignKey("RelatedCollectionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Collection");
 
                     b.Navigation("CreatedByUser");
+
+                    b.Navigation("RelatedCollection");
                 });
 
             modelBuilder.Entity("TechtonicCmsApi.Schema.TechtonicCms.Entities.ResourceOwnership", b =>

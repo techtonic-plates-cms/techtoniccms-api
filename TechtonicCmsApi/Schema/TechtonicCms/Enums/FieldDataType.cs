@@ -7,9 +7,6 @@ public enum FieldDataType
     Number,
     DateTime,
     Relation,
-    TextList,
-    NumberList,
     Asset,
-    RichText,
     Object
 }

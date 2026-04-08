@@ -16,7 +16,7 @@ namespace TechtonicCmsApi.Migrations
                 .Annotation("Npgsql:Enum:attribute_path", "subject_id,subject_role,subject_status,subject_created_at,resource_collection_id,resource_collection_slug,resource_collection_created_by,resource_collection_is_localized,resource_entry_id,resource_entry_status,resource_entry_created_by,resource_entry_collection_id,resource_entry_locale,resource_entry_published_at,resource_field_id,resource_field_name,resource_field_data_type,resource_field_sensitivity_level,resource_field_is_pii,resource_field_is_public,resource_field_collection_id,resource_asset_id,resource_asset_uploaded_by,resource_asset_mime_type,resource_asset_file_size,environment_current_time,environment_ip_address,environment_user_agent,action_type")
                 .Annotation("Npgsql:Enum:base_resource", "users,collections,entries,assets,fields")
                 .Annotation("Npgsql:Enum:entry_status", "draft,published,archived,deleted")
-                .Annotation("Npgsql:Enum:field_data_type", "text,boolean,number,date_time,relation,text_list,number_list,asset,rich_text,object")
+                .Annotation("Npgsql:Enum:field_data_type", "text,boolean,number,date_time,relation,asset,object")
                 .Annotation("Npgsql:Enum:locale", "en,es,fr,de,it,pt,ja,ko,zh,ar,ru")
                 .Annotation("Npgsql:Enum:logical_operator", "and,or")
                 .Annotation("Npgsql:Enum:operator_type", "eq,ne,in,not_in,gt,gte,lt,lte,contains,starts_with,ends_with,is_null,is_not_null,regex")

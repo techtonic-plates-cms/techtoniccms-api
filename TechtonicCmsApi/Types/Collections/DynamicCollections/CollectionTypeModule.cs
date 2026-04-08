@@ -244,10 +244,7 @@ public class CollectionTypeModule : TypeModule
         FieldDataType.Number => "Float",
         FieldDataType.DateTime => "DateTime",
         FieldDataType.Relation => "String",
-        FieldDataType.TextList => "[String]",
-        FieldDataType.NumberList => "[Float]",
         FieldDataType.Asset => "String",
-        FieldDataType.RichText => "String",
         FieldDataType.Object => "String",
         _ => "String"
     };
@@ -278,7 +275,6 @@ public class CollectionTypeModule : TypeModule
         switch (field.DataType)
         {
             case FieldDataType.Text:
-            case FieldDataType.RichText:
             case FieldDataType.Asset:
             case FieldDataType.Object:
             case FieldDataType.Relation:
@@ -300,11 +296,6 @@ public class CollectionTypeModule : TypeModule
                 filterDesc.Field(e => CmsDbFunctions.CmsExtractDateTime(e.Data, fieldName))
                     .Name(fieldName);
                 break;
-
-            // TextList and NumberList are not directly filterable via simple scalar operations
-            // They could be supported with custom array operations in the future
-            case FieldDataType.TextList:
-            case FieldDataType.NumberList:
             default:
                 break;
         }
@@ -322,7 +313,6 @@ public class CollectionTypeModule : TypeModule
         switch (field.DataType)
         {
             case FieldDataType.Text:
-            case FieldDataType.RichText:
             case FieldDataType.Asset:
             case FieldDataType.Object:
             case FieldDataType.Relation:
@@ -344,10 +334,6 @@ public class CollectionTypeModule : TypeModule
                 sortDesc.Field(e => CmsDbFunctions.CmsExtractDateTime(e.Data, fieldName))
                     .Name(fieldName);
                 break;
-
-            // TextList and NumberList are not directly sortable
-            case FieldDataType.TextList:
-            case FieldDataType.NumberList:
             default:
                 break;
         }

@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using TechtonicCmsApi.Contexts;
 using TechtonicCmsApi.Schema.TechtonicCms.Entities;
 using TechtonicCmsApi.Schema.TechtonicCms.Enums;
+using TechtonicCmsApi.Services;
 using TechtonicCmsApi.Types.Collections.DynamicCollections;
 
 namespace TechtonicCmsApi.Types.Collections;
@@ -124,14 +125,16 @@ public class UpdateCollectionInput
 
 public class CollectionMutation
 {
-    [Authorize]
+    [Authorize(Policy = "Collections:Create")]
     public async Task<Collection> Create(
         CreateCollectionInput input,
         [Service] TechtonicCmsDbContext db,
+        [Service] AbacService abacService,
         [Service] IHttpContextAccessor httpContextAccessor,
         [Service] CollectionTypeModule typeModule)
     {
         var userId = GetUserId(httpContextAccessor);
+        await abacService.RequirePermissionAsync(userId, BaseResource.Collections, PermissionAction.Create);
 
         var slugExists = await db.Collections.AnyAsync(c => c.Slug == input.Slug);
         if (slugExists)
@@ -215,14 +218,19 @@ public class CollectionMutation
         return collection;
     }
 
-    [Authorize]
+    [Authorize(Policy = "Collections:Update")]
     public async Task<Collection> Update(
         UpdateCollectionInput input,
         [Service] TechtonicCmsDbContext db,
+        [Service] AbacService abacService,
         [Service] IHttpContextAccessor httpContextAccessor,
         [Service] CollectionTypeModule typeModule)
     {
         var userId = GetUserId(httpContextAccessor);
+        await abacService.RequirePermissionAsync(userId, BaseResource.Collections, PermissionAction.Update);
+
+        if (input.Fields is { Length: > 0 } || input.DeleteFieldIds is { Length: > 0 })
+            await abacService.RequirePermissionAsync(userId, BaseResource.Collections, PermissionAction.ManageSchema);
 
         var collection = await db.Collections.FindAsync(input.Id);
         if (collection is null)
@@ -374,12 +382,17 @@ public class CollectionMutation
         return collection;
     }
 
-    [Authorize]
+    [Authorize(Policy = "Collections:Delete")]
     public async Task<bool> Delete(
         Guid id,
         [Service] TechtonicCmsDbContext db,
+        [Service] AbacService abacService,
+        [Service] IHttpContextAccessor httpContextAccessor,
         [Service] CollectionTypeModule typeModule)
     {
+        var userId = GetUserId(httpContextAccessor);
+        await abacService.RequirePermissionAsync(userId, BaseResource.Collections, PermissionAction.Delete);
+
         var collection = await db.Collections.FindAsync(id);
         if (collection is null)
             throw new GraphQLException(ErrorBuilder.New()

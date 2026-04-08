@@ -5,17 +5,24 @@ using HotChocolate.Types;
 using Microsoft.EntityFrameworkCore;
 using TechtonicCmsApi.Contexts;
 using TechtonicCmsApi.Schema.TechtonicCms.Entities;
+using TechtonicCmsApi.Schema.TechtonicCms.Enums;
+using TechtonicCmsApi.Services;
 
 namespace TechtonicCmsApi.Types.Collections;
 
 public class CollectionQuery
 {
-    [Authorize]
+    [Authorize(Policy = "Collections:Read")]
     public async Task<Collection?> Collection(
         Guid? id,
         string? slug,
-        [Service] TechtonicCmsDbContext db)
+        [Service] TechtonicCmsDbContext db,
+        [Service] AbacService abacService,
+        [Service] IHttpContextAccessor httpContextAccessor)
     {
+        var userId = GetUserId(httpContextAccessor);
+        await abacService.RequirePermissionAsync(userId, BaseResource.Collections, PermissionAction.Read);
+
         if (id is null && string.IsNullOrEmpty(slug))
             throw new GraphQLException(ErrorBuilder.New()
                 .SetMessage("Must provide either id or slug")
@@ -32,7 +39,7 @@ public class CollectionQuery
         return await query.FirstOrDefaultAsync();
     }
 
-    [Authorize]
+    [Authorize(Policy = "Collections:Read")]
     [UsePaging(MaxPageSize = 100)]
     [UseFiltering]
     [UseSorting]
@@ -40,8 +47,13 @@ public class CollectionQuery
         string? search,
         int? limit,
         int? offset,
-        [Service] TechtonicCmsDbContext db)
+        [Service] TechtonicCmsDbContext db,
+        [Service] AbacService abacService,
+        [Service] IHttpContextAccessor httpContextAccessor)
     {
+        var userId = GetUserId(httpContextAccessor);
+        await abacService.RequirePermissionAsync(userId, BaseResource.Collections, PermissionAction.Read);
+
         IQueryable<Collection> query = db.Collections;
 
         if (!string.IsNullOrEmpty(search))
@@ -54,6 +66,18 @@ public class CollectionQuery
             query = query.Take(limit.Value);
 
         return await query.OrderBy(c => c.Name).ToListAsync();
+    }
+
+    private static Guid GetUserId(IHttpContextAccessor httpContextAccessor)
+    {
+        var userIdStr = httpContextAccessor.HttpContext?.User.FindFirst("userId")?.Value;
+        if (userIdStr is null || !Guid.TryParse(userIdStr, out var userId))
+            throw new GraphQLException(ErrorBuilder.New()
+                .SetMessage("Authentication required")
+                .SetCode("UNAUTHENTICATED")
+                .Build());
+
+        return userId;
     }
 }
 

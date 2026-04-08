@@ -1,9 +1,13 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using HotChocolate;
+using HotChocolate.Data;
+using HotChocolate.Data.Filters;
+using HotChocolate.Data.Sorting;
 using HotChocolate.Execution.Configuration;
 using HotChocolate.Types;
 using HotChocolate.Types.Descriptors;
@@ -149,35 +153,69 @@ public class CollectionTypeModule : TypeModule
             ));
 
             types.Add(ObjectType.CreateUnsafe(entryTypeDef));
+
+            var filterTypeName = $"{pascalName}EntryFilterInput";
+            var sortTypeName = $"{pascalName}EntrySortInput";
+
             var collectionPropertyDef = new ObjectFieldDefinition(
                 camelName,
                 $"Access entries from the '{collection.Name}' collection",
                 TypeReference.Parse($"[{typeName}]"),
 
-                resolver: async _ =>
+                // Return IQueryable<Entry> so HC filter/sort/paging middleware can compose
+                resolver: _ =>
                 {
                     var innerScope = _scopeFactory.CreateScope();
-                    try
-                    {
-                        var innerDb = innerScope.ServiceProvider.GetRequiredService<TechtonicCmsDbContext>();
-                        var entries = from e in innerDb.Entries
-                                      where e.CollectionId == collectionId
-                                      select e;
-                        foreach (var entry in entries)
-                        {
-                            innerDb.Entry(entry).State = EntityState.Detached;
-                        }
+                    var innerDb = innerScope.ServiceProvider.GetRequiredService<TechtonicCmsDbContext>();
 
-                        return entries;
-                    }
-                    finally
+                    IQueryable<Entry> entries = innerDb.Entries
+                        .Where(e => e.CollectionId == collectionId);
+
+                    return new ValueTask<object?>(entries);
+                });
+
+            var fieldDescriptor = collectionPropertyDef.ToDescriptor(context)
+                .UsePaging(options: new() { MaxPageSize = 100 })
+                .UseFiltering<Entry>(filterDesc =>
+                {
+                    filterDesc.BindFieldsExplicitly();
+                    filterDesc.Name(filterTypeName);
+
+                    // Static entry fields
+                    filterDesc.Field(e => e.Name);
+                    filterDesc.Field(e => e.Slug);
+                    filterDesc.Field(e => e.Status);
+                    filterDesc.Field(e => e.CreatedAt);
+                    filterDesc.Field(e => e.UpdatedAt);
+                    filterDesc.Field(e => e.PublishedAt);
+
+                    // Dynamic jsonb fields
+                    foreach (var field in collection.Fields.OrderBy(f => f.CreatedAt))
                     {
-                        innerScope.Dispose();
+                        AddDynamicFilterField(filterDesc, field);
+                    }
+                })
+                .UseSorting<Entry>(sortDesc =>
+                {
+                    sortDesc.BindFieldsExplicitly();
+                    sortDesc.Name(sortTypeName);
+
+                    // Static entry fields
+                    sortDesc.Field(e => e.Name);
+                    sortDesc.Field(e => e.Slug);
+                    sortDesc.Field(e => e.Status);
+                    sortDesc.Field(e => e.CreatedAt);
+                    sortDesc.Field(e => e.UpdatedAt);
+                    sortDesc.Field(e => e.PublishedAt);
+
+                    // Dynamic jsonb fields
+                    foreach (var field in collection.Fields.OrderBy(f => f.CreatedAt))
+                    {
+                        AddDynamicSortField(sortDesc, field);
                     }
                 });
 
-            collectionPropertyDef = collectionPropertyDef.ToDescriptor(context).UsePaging(options: new() { MaxPageSize = 100 }).ToDefinition();
-            dynamicCollectionsTypeDef.Fields.Add(collectionPropertyDef);
+            dynamicCollectionsTypeDef.Fields.Add(fieldDescriptor.ToDefinition());
 
 
         }
@@ -226,5 +264,92 @@ public class CollectionTypeModule : TypeModule
         var parts = slug.Split('-', '_');
         return parts[0].ToLower() + string.Concat(
             parts[1..].Select(part => char.ToUpper(part[0]) + part[1..].ToLower()));
+    }
+
+    /// <summary>
+    /// Adds a dynamic jsonb field to the filter descriptor based on the field's <see cref="FieldDataType"/>.
+    /// Uses <see cref="CmsDbFunctions"/> methods as lambda expressions so EF Core translates them to
+    /// PostgreSQL <c>cms_extract_*</c> SQL functions.
+    /// </summary>
+    private static void AddDynamicFilterField(IFilterInputTypeDescriptor<Entry> filterDesc, Field field)
+    {
+        var fieldName = field.Name;
+
+        switch (field.DataType)
+        {
+            case FieldDataType.Text:
+            case FieldDataType.RichText:
+            case FieldDataType.Asset:
+            case FieldDataType.Object:
+            case FieldDataType.Relation:
+                filterDesc.Field(e => CmsDbFunctions.CmsExtractText(e.Data, fieldName))
+                    .Name(fieldName);
+                break;
+
+            case FieldDataType.Boolean:
+                filterDesc.Field(e => CmsDbFunctions.CmsExtractBoolean(e.Data, fieldName))
+                    .Name(fieldName);
+                break;
+
+            case FieldDataType.Number:
+                filterDesc.Field(e => CmsDbFunctions.CmsExtractNumber(e.Data, fieldName))
+                    .Name(fieldName);
+                break;
+
+            case FieldDataType.DateTime:
+                filterDesc.Field(e => CmsDbFunctions.CmsExtractDateTime(e.Data, fieldName))
+                    .Name(fieldName);
+                break;
+
+            // TextList and NumberList are not directly filterable via simple scalar operations
+            // They could be supported with custom array operations in the future
+            case FieldDataType.TextList:
+            case FieldDataType.NumberList:
+            default:
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Adds a dynamic jsonb field to the sort descriptor based on the field's <see cref="FieldDataType"/>.
+    /// Uses <see cref="CmsDbFunctions"/> methods as lambda expressions so EF Core translates them to
+    /// PostgreSQL <c>cms_extract_*</c> SQL functions.
+    /// </summary>
+    private static void AddDynamicSortField(ISortInputTypeDescriptor<Entry> sortDesc, Field field)
+    {
+        var fieldName = field.Name;
+
+        switch (field.DataType)
+        {
+            case FieldDataType.Text:
+            case FieldDataType.RichText:
+            case FieldDataType.Asset:
+            case FieldDataType.Object:
+            case FieldDataType.Relation:
+                sortDesc.Field(e => CmsDbFunctions.CmsExtractText(e.Data, fieldName))
+                    .Name(fieldName);
+                break;
+
+            case FieldDataType.Boolean:
+                sortDesc.Field(e => CmsDbFunctions.CmsExtractBoolean(e.Data, fieldName))
+                    .Name(fieldName);
+                break;
+
+            case FieldDataType.Number:
+                sortDesc.Field(e => CmsDbFunctions.CmsExtractNumber(e.Data, fieldName))
+                    .Name(fieldName);
+                break;
+
+            case FieldDataType.DateTime:
+                sortDesc.Field(e => CmsDbFunctions.CmsExtractDateTime(e.Data, fieldName))
+                    .Name(fieldName);
+                break;
+
+            // TextList and NumberList are not directly sortable
+            case FieldDataType.TextList:
+            case FieldDataType.NumberList:
+            default:
+                break;
+        }
     }
 }

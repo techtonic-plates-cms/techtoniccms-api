@@ -230,6 +230,29 @@ public class TechtonicCmsDbContext : DbContext
                 .WithMany(u => u.CreatedEntries)
                 .OnDelete(DeleteBehavior.Restrict);
         });
+
+        RegisterCmsDbFunctions(modelBuilder);
+    }
+
+    private static void RegisterCmsDbFunctions(ModelBuilder modelBuilder)
+    {
+        var functions = typeof(CmsDbFunctions);
+
+        modelBuilder.HasDbFunction(functions.GetMethod(nameof(CmsDbFunctions.CmsExtractText))!)
+            .HasName("cms_extract_text")
+            .HasSchema("public");
+
+        modelBuilder.HasDbFunction(functions.GetMethod(nameof(CmsDbFunctions.CmsExtractNumber))!)
+            .HasName("cms_extract_number")
+            .HasSchema("public");
+
+        modelBuilder.HasDbFunction(functions.GetMethod(nameof(CmsDbFunctions.CmsExtractBoolean))!)
+            .HasName("cms_extract_boolean")
+            .HasSchema("public");
+
+        modelBuilder.HasDbFunction(functions.GetMethod(nameof(CmsDbFunctions.CmsExtractDateTime))!)
+            .HasName("cms_extract_datetime")
+            .HasSchema("public");
     }
 
   

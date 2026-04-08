@@ -149,11 +149,11 @@ public class CollectionTypeModule : TypeModule
             ));
 
             types.Add(ObjectType.CreateUnsafe(entryTypeDef));
-
-            dynamicCollectionsTypeDef.Fields.Add(new ObjectFieldDefinition(
+            var collectionPropertyDef = new ObjectFieldDefinition(
                 camelName,
                 $"Access entries from the '{collection.Name}' collection",
                 TypeReference.Parse($"[{typeName}]"),
+
                 resolver: async _ =>
                 {
                     var innerScope = _scopeFactory.CreateScope();
@@ -162,23 +162,22 @@ public class CollectionTypeModule : TypeModule
                         var innerDb = innerScope.ServiceProvider.GetRequiredService<TechtonicCmsDbContext>();
                         var entries = from e in innerDb.Entries
                                       where e.CollectionId == collectionId
-                                      orderby e.CreatedAt descending
                                       select e;
                         foreach (var entry in entries)
                         {
                             innerDb.Entry(entry).State = EntityState.Detached;
                         }
 
-                        var es = await entries.ToListAsync(_.RequestAborted);
-
-                        return es;
+                        return entries;
                     }
                     finally
                     {
                         innerScope.Dispose();
                     }
-                }));
+                });
 
+            collectionPropertyDef = collectionPropertyDef.ToDescriptor(context).UsePaging(options: new() { MaxPageSize = 100 }).ToDefinition();
+            dynamicCollectionsTypeDef.Fields.Add(collectionPropertyDef);
 
 
         }

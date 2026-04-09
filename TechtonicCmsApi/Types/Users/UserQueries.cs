@@ -43,9 +43,10 @@ public class UserQuery
 
     [Authorize]
     [UsePaging(MaxPageSize = 100)]
+    [UseProjection]
     [UseFiltering]
     [UseSorting]
-    public async Task<IEnumerable<UserEntity>> Users(
+    public async Task<IQueryable<UserEntity>> Users(
         string? search,
         UserStatus? status,
         int? limit,
@@ -71,7 +72,7 @@ public class UserQuery
         if (limit.HasValue)
             query = query.Take(limit.Value);
 
-        return await query.ToListAsync();
+        return query;
     }
 
     private static Guid GetUserId(IHttpContextAccessor httpContextAccessor)

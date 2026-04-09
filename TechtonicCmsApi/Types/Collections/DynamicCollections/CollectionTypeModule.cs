@@ -11,7 +11,7 @@ using HotChocolate.Data;
 using HotChocolate.Data.Filters;
 using HotChocolate.Data.Sorting;
 using HotChocolate.Execution.Configuration;
-using HotChocolate.Types;
+using HotChocolate.Resolvers;
 using HotChocolate.Types.Descriptors;
 using HotChocolate.Types.Descriptors.Definitions;
 using Microsoft.AspNetCore.Http;
@@ -26,11 +26,9 @@ namespace TechtonicCmsApi.Types.Collections.DynamicCollections;
 
 public class CollectionTypeModule : TypeModule
 {
-    private readonly IServiceScopeFactory _scopeFactory;
 
-    public CollectionTypeModule(IServiceScopeFactory scopeFactory)
+    public CollectionTypeModule()
     {
-        _scopeFactory = scopeFactory;
     }
 
     public void TriggerTypesChanged() => OnTypesChanged();
@@ -41,8 +39,7 @@ public class CollectionTypeModule : TypeModule
     {
         var types = new List<ITypeSystemMember>();
 
-        using var scope = _scopeFactory.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<TechtonicCmsDbContext>();
+        var db = context.Services.GetRequiredService<IDbContextFactory<TechtonicCmsDbContext>>().CreateDbContext();
 
         var collections = await db.Collections
             .Include(c => c.Fields)
@@ -105,8 +102,7 @@ public class CollectionTypeModule : TypeModule
                             if (!data.TryGetValue("__entryId", out var rawEntryId) || rawEntryId is not Guid entryId)
                                 return null;
 
-                            using var relationScope = _scopeFactory.CreateScope();
-                            var relationDb = relationScope.ServiceProvider.GetRequiredService<TechtonicCmsDbContext>();
+                            var relationDb = ctx.Service<TechtonicCmsDbContext>();
 
                             var relation = await relationDb.EntryRelations
                                 .Where(r => r.EntryId == entryId && r.FieldId == fieldId)
@@ -206,22 +202,25 @@ public class CollectionTypeModule : TypeModule
             var collectionPropertyDef = new ObjectFieldDefinition(
                 camelName,
                 $"Access entries from the '{collection.Name}' collection",
-                TypeReference.Parse($"[{typeName}]"),
+                TypeReference.Parse(typeName), // Define it as a single type, this is necessary for paging to correctly wrap itself around our resolver
 
                 // Return IQueryable<Entry> so HC filter/sort/paging middleware can compose
-                resolver: _ =>
+                resolver: ctx =>
                 {
-                    var innerScope = _scopeFactory.CreateScope();
-                    var innerDb = innerScope.ServiceProvider.GetRequiredService<TechtonicCmsDbContext>();
-
+                    var innerDb = ctx.Service<TechtonicCmsDbContext>();
                     IQueryable<Entry> entries = innerDb.Entries
                         .Where(e => e.CollectionId == collectionId);
 
                     return new ValueTask<object?>(entries);
-                });
+                })
+            {
+                ResultType = typeof(IQueryable<Entry>)
+            };
 
             var fieldDescriptor = collectionPropertyDef.ToDescriptor(context)
-                .UsePaging(options: new() { MaxPageSize = 100 })
+                     .UsePaging(options: new() { MaxPageSize = 100 }, nodeType: typeof(ObjectType<Entry>),
+    connectionName: pascalName + "Entry")
+                //.UseProjection()
                 .UseFiltering<Entry>(filterDesc =>
                 {
                     filterDesc.BindFieldsExplicitly();
@@ -270,7 +269,7 @@ public class CollectionTypeModule : TypeModule
             "dynamicCollections",
             "List of all dynamic collections",
             TypeReference.Parse("DynamicCollections!"),
-            resolver: _ => new ValueTask<object?>(new[] { new Dictionary<string, object>() })
+            resolver: _ => new ValueTask<object?>(new Dictionary<string, object>())
         ));
 
         types.Add(ObjectTypeExtension.CreateUnsafe(queryExtensionDef));
@@ -335,10 +334,9 @@ public class CollectionTypeModule : TypeModule
 
             createFieldDef.Resolver = async ctx =>
             {
-                using var mutationScope = _scopeFactory.CreateScope();
-                var mutationDb = mutationScope.ServiceProvider.GetRequiredService<TechtonicCmsDbContext>();
-                var abacService = mutationScope.ServiceProvider.GetRequiredService<AbacService>();
-                var httpContextAccessor = mutationScope.ServiceProvider.GetRequiredService<IHttpContextAccessor>();
+                var mutationDb = ctx.Service<TechtonicCmsDbContext>();
+                var abacService = ctx.Service<AbacService>();
+                var httpContextAccessor = ctx.Service<IHttpContextAccessor>();
 
                 var userId = GetUserId(httpContextAccessor);
                 await abacService.RequirePermissionAsync(userId, BaseResource.Entries, PermissionAction.Create);
@@ -481,10 +479,9 @@ public class CollectionTypeModule : TypeModule
 
             updateFieldDef.Resolver = async ctx =>
             {
-                using var mutationScope = _scopeFactory.CreateScope();
-                var mutationDb = mutationScope.ServiceProvider.GetRequiredService<TechtonicCmsDbContext>();
-                var abacService = mutationScope.ServiceProvider.GetRequiredService<AbacService>();
-                var httpContextAccessor = mutationScope.ServiceProvider.GetRequiredService<IHttpContextAccessor>();
+                var mutationDb = ctx.Service<TechtonicCmsDbContext>();
+                var abacService = ctx.Service<AbacService>();
+                var httpContextAccessor = ctx.Service<IHttpContextAccessor>();
 
                 var userId = GetUserId(httpContextAccessor);
                 await abacService.RequirePermissionAsync(userId, BaseResource.Entries, PermissionAction.Update);
@@ -635,10 +632,9 @@ public class CollectionTypeModule : TypeModule
 
             deleteFieldDef.Resolver = async ctx =>
             {
-                using var mutationScope = _scopeFactory.CreateScope();
-                var mutationDb = mutationScope.ServiceProvider.GetRequiredService<TechtonicCmsDbContext>();
-                var abacService = mutationScope.ServiceProvider.GetRequiredService<AbacService>();
-                var httpContextAccessor = mutationScope.ServiceProvider.GetRequiredService<IHttpContextAccessor>();
+                var mutationDb = ctx.Service<TechtonicCmsDbContext>();
+                var abacService = ctx.Service<AbacService>();
+                var httpContextAccessor = ctx.Service<IHttpContextAccessor>();
 
                 var userId = GetUserId(httpContextAccessor);
                 await abacService.RequirePermissionAsync(userId, BaseResource.Entries, PermissionAction.Delete);
@@ -679,10 +675,9 @@ public class CollectionTypeModule : TypeModule
 
             publishFieldDef.Resolver = async ctx =>
             {
-                using var mutationScope = _scopeFactory.CreateScope();
-                var mutationDb = mutationScope.ServiceProvider.GetRequiredService<TechtonicCmsDbContext>();
-                var abacService = mutationScope.ServiceProvider.GetRequiredService<AbacService>();
-                var httpContextAccessor = mutationScope.ServiceProvider.GetRequiredService<IHttpContextAccessor>();
+                var mutationDb = ctx.Service<TechtonicCmsDbContext>();
+                var abacService = ctx.Service<AbacService>();
+                var httpContextAccessor = ctx.Service<IHttpContextAccessor>();
 
                 var userId = GetUserId(httpContextAccessor);
                 await abacService.RequirePermissionAsync(userId, BaseResource.Entries, PermissionAction.Publish);
@@ -738,6 +733,7 @@ public class CollectionTypeModule : TypeModule
         types.Add(ObjectTypeExtension.CreateUnsafe(mutationExtensionDef));
 
         return types;
+
     }
 
     private static void AddMetadataFields(ObjectTypeDefinition typeDef)

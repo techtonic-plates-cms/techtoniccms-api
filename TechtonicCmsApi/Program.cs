@@ -14,7 +14,7 @@ builder.Configuration.AddEnvironmentVariables();
 
 var connectionString = $"Host={builder.Configuration["Database:Url"]};Port={builder.Configuration["Database:Port"]};Username={builder.Configuration["Database:User"]};Password={builder.Configuration["Database:Password"]};Database={builder.Configuration["Database:Name"]}";
 
-builder.Services.AddDbContext<TechtonicCmsDbContext>(options =>
+builder.Services.AddPooledDbContextFactory<TechtonicCmsDbContext>(options =>
     options.UseNpgsql(connectionString));
 
 builder.Services.AddSingleton<RedisService>();
@@ -80,6 +80,7 @@ builder.AddGraphQL()
         options.IncludeExceptionDetails = builder.Environment.IsDevelopment();
     })
     .AddTypeModule<CollectionTypeModule>()
+    
     .AddTypes();
 
 var app = builder.Build();

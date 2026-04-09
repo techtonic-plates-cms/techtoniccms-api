@@ -74,6 +74,7 @@ builder.AddGraphQL()
     .AddFiltering()
     .AddSorting()
     .AddPagingArguments()
+    .ModifyOptions(o => o.EnableOneOf = true)
     .ModifyRequestOptions(options =>
     {
         options.IncludeExceptionDetails = builder.Environment.IsDevelopment();

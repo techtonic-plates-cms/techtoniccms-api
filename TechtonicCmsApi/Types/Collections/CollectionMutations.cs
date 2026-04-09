@@ -11,6 +11,26 @@ using TechtonicCmsApi.Types.Collections.DynamicCollections;
 
 namespace TechtonicCmsApi.Types.Collections;
 
+public class SimpleFieldConfigInput
+{
+    [GraphQLType<NonNullType<EnumType<SimpleFieldDataType>>>]
+    public SimpleFieldDataType DataType { get; set; }
+}
+
+public class RelationFieldConfigInput
+{
+    [GraphQLType<NonNullType<IdType>>]
+    public Guid RelatedCollectionId { get; set; }
+}
+
+[OneOf]
+public class FieldConfigInput
+{
+    public SimpleFieldConfigInput? Simple { get; set; }
+
+    public RelationFieldConfigInput? Relation { get; set; }
+}
+
 public class FieldDefinitionInput
 {
     [GraphQLType<NonNullType<StringType>>]
@@ -19,8 +39,6 @@ public class FieldDefinitionInput
     public string? Label { get; set; }
 
     public string? Description { get; set; }
-
-    public FieldDataType DataType { get; set; }
 
     public bool? IsRequired { get; set; }
 
@@ -40,8 +58,8 @@ public class FieldDefinitionInput
 
     public string? HelpText { get; set; }
 
-    [GraphQLType<IdType>]
-    public Guid? RelatedCollectionId { get; set; }
+    [GraphQLNonNullType]
+    public FieldConfigInput Config { get; set; } = new();
 }
 
 public class FieldUpdateDefinitionInput
@@ -186,25 +204,29 @@ public class CollectionMutation
                         .SetCode("BAD_REQUEST")
                         .Build());
 
-                if (fieldInput.DataType == FieldDataType.Relation)
-                {
-                    if (!fieldInput.RelatedCollectionId.HasValue)
-                        throw new GraphQLException(ErrorBuilder.New()
-                            .SetMessage("RelatedCollectionId is required for Relation fields")
-                            .SetCode("BAD_REQUEST")
-                            .Build());
+                FieldDataType dataType;
+                Guid? relatedCollectionId = null;
 
-                    var relatedExists = await db.Collections.AnyAsync(c => c.Id == fieldInput.RelatedCollectionId.Value);
+                if (fieldInput.Config.Relation is { } relationConfig)
+                {
+                    dataType = FieldDataType.Relation;
+                    relatedCollectionId = relationConfig.RelatedCollectionId;
+
+                    var relatedExists = await db.Collections.AnyAsync(c => c.Id == relationConfig.RelatedCollectionId);
                     if (!relatedExists)
                         throw new GraphQLException(ErrorBuilder.New()
-                            .SetMessage($"Referenced collection '{fieldInput.RelatedCollectionId.Value}' not found")
+                            .SetMessage($"Referenced collection '{relationConfig.RelatedCollectionId}' not found")
                             .SetCode("NOT_FOUND")
                             .Build());
                 }
-                else if (fieldInput.RelatedCollectionId.HasValue)
+                else if (fieldInput.Config.Simple is { } simpleConfig)
+                {
+                    dataType = (FieldDataType)simpleConfig.DataType;
+                }
+                else
                 {
                     throw new GraphQLException(ErrorBuilder.New()
-                        .SetMessage("RelatedCollectionId can only be set for Relation fields")
+                        .SetMessage("Field config must specify either 'simple' or 'relation'")
                         .SetCode("BAD_REQUEST")
                         .Build());
                 }
@@ -216,7 +238,7 @@ public class CollectionMutation
                     Name = fieldInput.Name,
                     Label = fieldInput.Label,
                     Description = fieldInput.Description,
-                    DataType = fieldInput.DataType,
+                    DataType = dataType,
                     IsRequired = fieldInput.IsRequired ?? false,
                     IsUnique = fieldInput.IsUnique ?? false,
                     IsPublic = fieldInput.IsPublic ?? true,
@@ -226,9 +248,7 @@ public class CollectionMutation
                     ValidationRules = fieldInput.ValidationRules,
                     DefaultValue = fieldInput.DefaultValue,
                     HelpText = fieldInput.HelpText,
-                    RelatedCollectionId = fieldInput.DataType == FieldDataType.Relation
-                        ? fieldInput.RelatedCollectionId
-                        : null,
+                    RelatedCollectionId = relatedCollectionId,
                     CreatedBy = userId,
                     CreatedAt = now,
                     UpdatedAt = now

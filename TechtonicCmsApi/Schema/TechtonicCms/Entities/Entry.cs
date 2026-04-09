@@ -41,14 +41,14 @@ public class Entry
     {
         Data.Dispose();
     }
-  /*  public ICollection<EntryRelation> FromRelations { get; set; } = new List<EntryRelation>();
+
+    /// <summary>
+    /// Relations where this entry is the source (this entry references another entry).
+    /// </summary>
+    public ICollection<EntryRelation> FromRelations { get; set; } = new List<EntryRelation>();
+
+    /// <summary>
+    /// Relations where this entry is the target (another entry references this entry).
+    /// </summary>
     public ICollection<EntryRelation> ToRelations { get; set; } = new List<EntryRelation>();
-    public ICollection<EntryTypstText> TypstTexts { get; set; } = new List<EntryTypstText>();
-    public ICollection<EntryText> Texts { get; set; } = new List<EntryText>();
-    public ICollection<EntryBoolean> Booleans { get; set; } = new List<EntryBoolean>();
-    public ICollection<EntryNumber> Numbers { get; set; } = new List<EntryNumber>();
-    public ICollection<EntryDateTime> DateTimes { get; set; } = new List<EntryDateTime>();
-    public ICollection<EntryRichText> RichTexts { get; set; } = new List<EntryRichText>();
-    public ICollection<EntryJsonData> JsonData { get; set; } = new List<EntryJsonData>();
-    public ICollection<EntryAsset> Assets { get; set; } = new List<EntryAsset>(); */
 }

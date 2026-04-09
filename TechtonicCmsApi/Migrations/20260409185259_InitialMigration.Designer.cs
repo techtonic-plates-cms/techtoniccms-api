@@ -13,7 +13,7 @@ using TechtonicCmsApi.Contexts;
 namespace TechtonicCmsApi.Migrations
 {
     [DbContext(typeof(TechtonicCmsDbContext))]
-    [Migration("20260408215114_InitialMigration")]
+    [Migration("20260409185259_InitialMigration")]
     partial class InitialMigration
     {
         /// <inheritdoc />
@@ -492,6 +492,34 @@ namespace TechtonicCmsApi.Migrations
                     b.ToTable("entries");
                 });
 
+            modelBuilder.Entity("TechtonicCmsApi.Schema.TechtonicCms.Entities.EntryRelation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<Guid>("EntryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("FieldId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TargetEntryId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FieldId");
+
+                    b.HasIndex("TargetEntryId");
+
+                    b.HasIndex("EntryId", "FieldId")
+                        .IsUnique();
+
+                    b.ToTable("entry_relations");
+                });
+
             modelBuilder.Entity("TechtonicCmsApi.Schema.TechtonicCms.Entities.Field", b =>
                 {
                     b.Property<Guid>("Id")
@@ -931,6 +959,33 @@ namespace TechtonicCmsApi.Migrations
                     b.Navigation("CreatedByUser");
                 });
 
+            modelBuilder.Entity("TechtonicCmsApi.Schema.TechtonicCms.Entities.EntryRelation", b =>
+                {
+                    b.HasOne("TechtonicCmsApi.Schema.TechtonicCms.Entities.Entry", "Entry")
+                        .WithMany("FromRelations")
+                        .HasForeignKey("EntryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("TechtonicCmsApi.Schema.TechtonicCms.Entities.Field", "Field")
+                        .WithMany("EntryRelations")
+                        .HasForeignKey("FieldId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TechtonicCmsApi.Schema.TechtonicCms.Entities.Entry", "TargetEntry")
+                        .WithMany("ToRelations")
+                        .HasForeignKey("TargetEntryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Entry");
+
+                    b.Navigation("Field");
+
+                    b.Navigation("TargetEntry");
+                });
+
             modelBuilder.Entity("TechtonicCmsApi.Schema.TechtonicCms.Entities.Field", b =>
                 {
                     b.HasOne("TechtonicCmsApi.Schema.TechtonicCms.Entities.Collection", "Collection")
@@ -1067,6 +1122,18 @@ namespace TechtonicCmsApi.Migrations
                     b.Navigation("Entries");
 
                     b.Navigation("Fields");
+                });
+
+            modelBuilder.Entity("TechtonicCmsApi.Schema.TechtonicCms.Entities.Entry", b =>
+                {
+                    b.Navigation("FromRelations");
+
+                    b.Navigation("ToRelations");
+                });
+
+            modelBuilder.Entity("TechtonicCmsApi.Schema.TechtonicCms.Entities.Field", b =>
+                {
+                    b.Navigation("EntryRelations");
                 });
 
             modelBuilder.Entity("TechtonicCmsApi.Schema.TechtonicCms.Entities.Role", b =>

@@ -21,6 +21,7 @@ public class TechtonicCmsDbContext : DbContext
     public DbSet<Collection> Collections => Set<Collection>();
     public DbSet<Field> Fields => Set<Field>();
     public DbSet<Entry> Entries => Set<Entry>();
+    public DbSet<EntryRelation> EntryRelations => Set<EntryRelation>();
 
     public DbSet<Asset> Assets => Set<Asset>();
 
@@ -40,6 +41,7 @@ public class TechtonicCmsDbContext : DbContext
         ConfigureCollection(modelBuilder);
         ConfigureField(modelBuilder);
         ConfigureEntry(modelBuilder);
+        ConfigureEntryRelation(modelBuilder);
         ConfigureAsset(modelBuilder);
     }
 
@@ -261,6 +263,36 @@ public class TechtonicCmsDbContext : DbContext
     }
 
   
+
+
+    private static void ConfigureEntryRelation(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<EntryRelation>(e =>
+        {
+            e.Property(r => r.Id).HasDefaultValueSql("gen_random_uuid()");
+
+            // Each field on an entry can have at most one relation target (1:1 field → target).
+            e.HasIndex(r => new { r.EntryId, r.FieldId }).IsUnique();
+
+            // Source entry → its relations. If the source entry is deleted, remove its relations.
+            e.HasOne(r => r.Entry)
+                .WithMany(en => en.FromRelations)
+                .HasForeignKey(r => r.EntryId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Field definition → relations using it. Restrict: don't delete a field while relations exist.
+            e.HasOne(r => r.Field)
+                .WithMany(f => f.EntryRelations)
+                .HasForeignKey(r => r.FieldId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Target entry → relations pointing to it. If the target is deleted, remove the relation.
+            e.HasOne(r => r.TargetEntry)
+                .WithMany(en => en.ToRelations)
+                .HasForeignKey(r => r.TargetEntryId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+    }
 
 
     private static void ConfigureAsset(ModelBuilder modelBuilder)

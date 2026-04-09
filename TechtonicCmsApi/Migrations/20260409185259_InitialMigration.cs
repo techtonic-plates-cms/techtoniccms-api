@@ -452,6 +452,38 @@ namespace TechtonicCmsApi.Migrations
                         onDelete: ReferentialAction.Cascade);
                 });
 
+            migrationBuilder.CreateTable(
+                name: "entry_relations",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
+                    EntryId = table.Column<Guid>(type: "uuid", nullable: false),
+                    FieldId = table.Column<Guid>(type: "uuid", nullable: false),
+                    TargetEntryId = table.Column<Guid>(type: "uuid", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_entry_relations", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_entry_relations_entries_EntryId",
+                        column: x => x.EntryId,
+                        principalTable: "entries",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_entry_relations_entries_TargetEntryId",
+                        column: x => x.TargetEntryId,
+                        principalTable: "entries",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_entry_relations_fields_FieldId",
+                        column: x => x.FieldId,
+                        principalTable: "fields",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
             migrationBuilder.CreateIndex(
                 name: "IX_abac_audit_Decision_Timestamp",
                 table: "abac_audit",
@@ -585,6 +617,22 @@ namespace TechtonicCmsApi.Migrations
                 column: "CreatedBy");
 
             migrationBuilder.CreateIndex(
+                name: "IX_entry_relations_EntryId_FieldId",
+                table: "entry_relations",
+                columns: new[] { "EntryId", "FieldId" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_entry_relations_FieldId",
+                table: "entry_relations",
+                column: "FieldId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_entry_relations_TargetEntryId",
+                table: "entry_relations",
+                column: "TargetEntryId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_fields_CollectionId_Name",
                 table: "fields",
                 columns: new[] { "CollectionId", "Name" },
@@ -688,6 +736,7 @@ namespace TechtonicCmsApi.Migrations
                 table: "user_roles",
                 columns: new[] { "UserId", "RoleId" },
                 unique: true);
+
             // CMS JSONB extraction functions for querying dynamic field values.
             // Each function extracts a typed value from a JSONB document by key.
             // IMMUTABLE = same inputs always produce same output (required for expression indexes).
@@ -734,7 +783,7 @@ namespace TechtonicCmsApi.Migrations
                 name: "abac_policy_rules");
 
             migrationBuilder.DropTable(
-                name: "entries");
+                name: "entry_relations");
 
             migrationBuilder.DropTable(
                 name: "resource_ownerships");
@@ -749,16 +798,19 @@ namespace TechtonicCmsApi.Migrations
                 name: "user_roles");
 
             migrationBuilder.DropTable(
-                name: "fields");
+                name: "entries");
 
             migrationBuilder.DropTable(
-                name: "assets");
+                name: "fields");
 
             migrationBuilder.DropTable(
                 name: "abac_policies");
 
             migrationBuilder.DropTable(
                 name: "roles");
+
+            migrationBuilder.DropTable(
+                name: "assets");
 
             migrationBuilder.DropTable(
                 name: "collections");

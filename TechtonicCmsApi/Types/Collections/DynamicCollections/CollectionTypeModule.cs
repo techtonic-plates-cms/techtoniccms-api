@@ -1,10 +1,12 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Security.Claims;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using HotChocolate;
+using HotChocolate.Authorization;
 using HotChocolate.Data;
 using HotChocolate.Data.Filters;
 using HotChocolate.Data.Sorting;
@@ -12,11 +14,13 @@ using HotChocolate.Execution.Configuration;
 using HotChocolate.Types;
 using HotChocolate.Types.Descriptors;
 using HotChocolate.Types.Descriptors.Definitions;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using TechtonicCmsApi.Contexts;
 using TechtonicCmsApi.Schema.TechtonicCms.Entities;
 using TechtonicCmsApi.Schema.TechtonicCms.Enums;
+using TechtonicCmsApi.Services;
 
 namespace TechtonicCmsApi.Types.Collections.DynamicCollections;
 
@@ -87,8 +91,8 @@ public class CollectionTypeModule : TypeModule
                     && field.RelatedCollectionId.HasValue
                     && collectionTypeMap.TryGetValue(field.RelatedCollectionId.Value, out var relationTypeName))
                 {
-                    // Relation field: resolve to the target collection's entry type
-                    var relatedCollectionId = field.RelatedCollectionId.Value;
+                    // Relation field: resolve via entry_relations join table
+                    var fieldId = field.Id;
                     dataTypeDef.Fields.Add(new ObjectFieldDefinition(
                         field.Name,
                         field.Description,
@@ -96,16 +100,20 @@ public class CollectionTypeModule : TypeModule
                         resolver: async ctx =>
                         {
                             var data = ctx.Parent<Dictionary<string, object>>();
-                            var rawValue = data.GetValueOrDefault(field.Name);
 
-                            if (rawValue is not string guidString || !Guid.TryParse(guidString, out var entryId))
+                            // The __entryId key is injected by the data resolver below
+                            if (!data.TryGetValue("__entryId", out var rawEntryId) || rawEntryId is not Guid entryId)
                                 return null;
 
                             using var relationScope = _scopeFactory.CreateScope();
                             var relationDb = relationScope.ServiceProvider.GetRequiredService<TechtonicCmsDbContext>();
 
-                            return await relationDb.Entries
-                                .FirstOrDefaultAsync(e => e.Id == entryId);
+                            var relation = await relationDb.EntryRelations
+                                .Where(r => r.EntryId == entryId && r.FieldId == fieldId)
+                                .Include(r => r.TargetEntry)
+                                .FirstOrDefaultAsync();
+
+                            return relation?.TargetEntry;
                         }));
                 }
                 else
@@ -180,8 +188,13 @@ public class CollectionTypeModule : TypeModule
                 resolver: _ =>
                 {
                     var entry = _.Parent<Entry>();
-                    var dict = JsonSerializer.Deserialize<Dictionary<string, object>>(entry.Data.RootElement.GetRawText(), new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-                    return new ValueTask<object?>(dict ?? new Dictionary<string, object>());
+                    var dict = JsonSerializer.Deserialize<Dictionary<string, object>>(entry.Data.RootElement.GetRawText(), new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+                        ?? new Dictionary<string, object>();
+
+                    // Inject entry ID so relation field resolvers can query entry_relations
+                    dict["__entryId"] = entry.Id;
+
+                    return new ValueTask<object?>(dict);
                 }
             ));
 
@@ -262,6 +275,468 @@ public class CollectionTypeModule : TypeModule
 
         types.Add(ObjectTypeExtension.CreateUnsafe(queryExtensionDef));
 
+        // ──────────────────────────────────────────────────────────────
+        // Dynamic Mutation Types
+        // ──────────────────────────────────────────────────────────────
+
+        var dynamicCollectionsMutationsTypeDef = new ObjectTypeDefinition("DynamicCollectionsMutations")
+        {
+            Description = "Root type for all dynamic collection mutations",
+            RuntimeType = typeof(Dictionary<string, object>)
+        };
+
+        types.Add(ObjectType.CreateUnsafe(dynamicCollectionsMutationsTypeDef));
+
+        foreach (var collection in collections)
+        {
+            var pascalName = ToPascalCase(collection.Slug);
+            var camelName = ToCamelCase(collection.Slug);
+            var collectionMutationsTypeName = $"{pascalName}Mutations";
+            var entryTypeName = $"{pascalName}Entry";
+            var collectionId = collection.Id;
+            var fields = collection.Fields.OrderBy(f => f.CreatedAt).ToList();
+
+            // ── Per-collection mutation sub-type ──
+            var collectionMutationsTypeDef = new ObjectTypeDefinition(collectionMutationsTypeName)
+            {
+                Description = $"Mutations for the '{collection.Name}' collection",
+                RuntimeType = typeof(Dictionary<string, object>)
+            };
+
+            // ── create mutation ──
+            var createFieldDef = new ObjectFieldDefinition(
+                "create",
+                $"Create a new entry in the '{collection.Name}' collection",
+                TypeReference.Parse($"{entryTypeName}!"));
+
+            createFieldDef.Arguments.Add(new ArgumentDefinition(
+                "name", "Entry name", TypeReference.Parse("String!")));
+
+            createFieldDef.Arguments.Add(new ArgumentDefinition(
+                "slug", "URL-friendly identifier (auto-generated if omitted)", TypeReference.Parse("String")));
+
+            createFieldDef.Arguments.Add(new ArgumentDefinition(
+                "locale", "Entry locale (defaults to collection default)", TypeReference.Parse("String")));
+
+            createFieldDef.Arguments.Add(new ArgumentDefinition(
+                "status", "Entry status (defaults to DRAFT)", TypeReference.Parse("String")));
+
+            foreach (var field in fields)
+            {
+                var argType = MapFieldType(field.DataType);
+                if (field.IsRequired)
+                    argType += "!";
+
+                createFieldDef.Arguments.Add(new ArgumentDefinition(
+                    field.Name,
+                    field.Description ?? $"Field '{field.Name}'",
+                    TypeReference.Parse(argType)));
+            }
+
+            createFieldDef.Resolver = async ctx =>
+            {
+                using var mutationScope = _scopeFactory.CreateScope();
+                var mutationDb = mutationScope.ServiceProvider.GetRequiredService<TechtonicCmsDbContext>();
+                var abacService = mutationScope.ServiceProvider.GetRequiredService<AbacService>();
+                var httpContextAccessor = mutationScope.ServiceProvider.GetRequiredService<IHttpContextAccessor>();
+
+                var userId = GetUserId(httpContextAccessor);
+                await abacService.RequirePermissionAsync(userId, BaseResource.Entries, PermissionAction.Create);
+
+                var name = ctx.ArgumentValue<string>("name");
+                var slug = ctx.ArgumentValue<string>("slug");
+                var localeStr = ctx.ArgumentValue<string>("locale");
+                var statusStr = ctx.ArgumentValue<string>("status");
+
+                // Load collection fields for validation
+                var collectionFields = await mutationDb.Fields
+                    .Where(f => f.CollectionId == collectionId)
+                    .ToListAsync();
+
+                // Separate scalar vs relation field values
+                var scalarData = new Dictionary<string, object?>();
+                var relationValues = new Dictionary<Guid, string>(); // fieldId → target entry ID string
+
+                foreach (var f in collectionFields)
+                {
+                    var argVal = ctx.ArgumentValue<object?>(f.Name);
+
+                    if (f.DataType == FieldDataType.Relation)
+                    {
+                        // Relation values go to the join table, not JSONB
+                        if (argVal is not null)
+                        {
+                            relationValues[f.Id] = argVal.ToString()!;
+                        }
+                        else if (f.IsRequired)
+                        {
+                            throw new GraphQLException(ErrorBuilder.New()
+                                .SetMessage($"Required relation field '{f.Name}' is missing")
+                                .SetCode("BAD_REQUEST")
+                                .Build());
+                        }
+                    }
+                    else
+                    {
+                        if (argVal is not null)
+                            scalarData[f.Name] = argVal;
+                        else if (f.IsRequired)
+                            throw new GraphQLException(ErrorBuilder.New()
+                                .SetMessage($"Required field '{f.Name}' is missing")
+                                .SetCode("BAD_REQUEST")
+                                .Build());
+                    }
+                }
+
+                // Validate scalar data (uniqueness) and relation targets
+                await ValidateEntryData(scalarData, relationValues, collectionFields, mutationDb, collectionId, excludeEntryId: null);
+
+                var entrySlug = slug ?? GenerateSlug(name);
+                var slugConflict = await mutationDb.Entries
+                    .AnyAsync(e => e.CollectionId == collectionId && e.Slug == entrySlug);
+                if (slugConflict)
+                    entrySlug = $"{entrySlug}-{Guid.NewGuid().ToString("N")[..8]}";
+
+                Locale locale = collection.DefaultLocale;
+                if (localeStr is not null && Enum.TryParse<Locale>(localeStr, true, out var parsedLocale))
+                    locale = parsedLocale;
+
+                EntryStatus status = EntryStatus.Draft;
+                if (statusStr is not null && Enum.TryParse<EntryStatus>(statusStr, true, out var parsedStatus))
+                    status = parsedStatus;
+
+                var now = DateTime.UtcNow;
+                var json = JsonSerializer.Serialize(scalarData.Where(kvp => kvp.Value is not null)
+                    .ToDictionary(kvp => kvp.Key, kvp => kvp.Value));
+
+                var entry = new Entry
+                {
+                    Id = Guid.NewGuid(),
+                    Name = name,
+                    Slug = entrySlug,
+                    CollectionId = collectionId,
+                    CreatedBy = userId,
+                    Locale = locale,
+                    DefaultLocale = collection.DefaultLocale,
+                    Status = status,
+                    Data = JsonDocument.Parse(json),
+                    CreatedAt = now,
+                    UpdatedAt = now,
+                    PublishedAt = status == EntryStatus.Published ? now : null
+                };
+
+                mutationDb.Entries.Add(entry);
+
+                // Write relation rows
+                foreach (var (fieldId, targetIdStr) in relationValues)
+                {
+                    if (Guid.TryParse(targetIdStr, out var targetId))
+                    {
+                        mutationDb.EntryRelations.Add(new EntryRelation
+                        {
+                            EntryId = entry.Id,
+                            FieldId = fieldId,
+                            TargetEntryId = targetId
+                        });
+                    }
+                }
+
+                await mutationDb.SaveChangesAsync();
+
+                return entry;
+            };
+
+            collectionMutationsTypeDef.Fields.Add(createFieldDef);
+
+            // ── update mutation ──
+            var updateFieldDef = new ObjectFieldDefinition(
+                "update",
+                $"Update an existing entry in the '{collection.Name}' collection",
+                TypeReference.Parse($"{entryTypeName}!"));
+
+            updateFieldDef.Arguments.Add(new ArgumentDefinition(
+                "id", "Entry ID to update", TypeReference.Parse("ID!")));
+
+            updateFieldDef.Arguments.Add(new ArgumentDefinition(
+                "name", "New entry name", TypeReference.Parse("String")));
+
+            updateFieldDef.Arguments.Add(new ArgumentDefinition(
+                "slug", "New URL-friendly identifier", TypeReference.Parse("String")));
+
+            updateFieldDef.Arguments.Add(new ArgumentDefinition(
+                "locale", "New locale", TypeReference.Parse("String")));
+
+            updateFieldDef.Arguments.Add(new ArgumentDefinition(
+                "status", "New status", TypeReference.Parse("String")));
+
+            foreach (var field in fields)
+            {
+                // Update args are always optional (partial update)
+                var argType = MapFieldType(field.DataType);
+                updateFieldDef.Arguments.Add(new ArgumentDefinition(
+                    field.Name,
+                    field.Description ?? $"Field '{field.Name}'",
+                    TypeReference.Parse(argType)));
+            }
+
+            updateFieldDef.Resolver = async ctx =>
+            {
+                using var mutationScope = _scopeFactory.CreateScope();
+                var mutationDb = mutationScope.ServiceProvider.GetRequiredService<TechtonicCmsDbContext>();
+                var abacService = mutationScope.ServiceProvider.GetRequiredService<AbacService>();
+                var httpContextAccessor = mutationScope.ServiceProvider.GetRequiredService<IHttpContextAccessor>();
+
+                var userId = GetUserId(httpContextAccessor);
+                await abacService.RequirePermissionAsync(userId, BaseResource.Entries, PermissionAction.Update);
+
+                var idStr = ctx.ArgumentValue<string>("id");
+                if (!Guid.TryParse(idStr, out var entryId))
+                    throw new GraphQLException(ErrorBuilder.New()
+                        .SetMessage("Invalid entry ID")
+                        .SetCode("BAD_REQUEST")
+                        .Build());
+
+                var entry = await mutationDb.Entries.FirstOrDefaultAsync(e =>
+                    e.Id == entryId && e.CollectionId == collectionId);
+
+                if (entry is null)
+                    throw new GraphQLException(ErrorBuilder.New()
+                        .SetMessage("Entry not found")
+                        .SetCode("NOT_FOUND")
+                        .Build());
+
+                var name = ctx.ArgumentValue<string>("name");
+                var slug = ctx.ArgumentValue<string>("slug");
+                var localeStr = ctx.ArgumentValue<string>("locale");
+                var statusStr = ctx.ArgumentValue<string>("status");
+
+                if (name is not null) entry.Name = name;
+                if (slug is not null)
+                {
+                    var slugConflict = await mutationDb.Entries
+                        .AnyAsync(e => e.CollectionId == collectionId && e.Slug == slug && e.Id != entryId);
+                    if (slugConflict)
+                        throw new GraphQLException(ErrorBuilder.New()
+                            .SetMessage($"An entry with slug '{slug}' already exists in this collection")
+                            .SetCode("CONFLICT")
+                            .Build());
+                    entry.Slug = slug;
+                }
+                if (localeStr is not null && Enum.TryParse<Locale>(localeStr, true, out var parsedLocale))
+                    entry.Locale = parsedLocale;
+                if (statusStr is not null && Enum.TryParse<EntryStatus>(statusStr, true, out var parsedStatus))
+                {
+                    entry.Status = parsedStatus;
+                    if (parsedStatus == EntryStatus.Published && entry.PublishedAt is null)
+                        entry.PublishedAt = DateTime.UtcNow;
+                }
+
+                // Merge dynamic field data
+                var collectionFields = await mutationDb.Fields
+                    .Where(f => f.CollectionId == collectionId)
+                    .ToListAsync();
+
+                var existingData = JsonSerializer.Deserialize<Dictionary<string, object?>>(
+                    entry.Data.RootElement.GetRawText(),
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+                    ?? new Dictionary<string, object?>();
+
+                var scalarChanged = false;
+                var relationChanges = new Dictionary<Guid, string?>(); // fieldId → targetId (null = remove)
+
+                foreach (var f in collectionFields)
+                {
+                    var argVal = ctx.ArgumentValue<object?>(f.Name);
+                    if (argVal is null) continue;
+
+                    if (f.DataType == FieldDataType.Relation)
+                    {
+                        // Track relation changes for the join table
+                        relationChanges[f.Id] = argVal.ToString();
+                    }
+                    else
+                    {
+                        existingData[f.Name] = argVal;
+                        scalarChanged = true;
+                    }
+                }
+
+                if (scalarChanged)
+                {
+                    // Validate unique constraints on scalar data only
+                    await ValidateEntryData(existingData, new Dictionary<Guid, string>(), collectionFields, mutationDb, collectionId, excludeEntryId: entryId);
+                    entry.Data.Dispose();
+                    entry.Data = JsonDocument.Parse(
+                        JsonSerializer.Serialize(existingData.Where(kvp => kvp.Value is not null)
+                            .ToDictionary(kvp => kvp.Key, kvp => kvp.Value)));
+                }
+
+                // Apply relation changes to join table
+                if (relationChanges.Count > 0)
+                {
+                    var changedFieldIds = relationChanges.Keys.ToList();
+                    var existingRelations = await mutationDb.EntryRelations
+                        .Where(er => er.EntryId == entryId && changedFieldIds.Contains(er.FieldId))
+                        .ToListAsync();
+
+                    // Validate relation targets
+                    var relationValues = relationChanges
+                        .Where(kvp => kvp.Value is not null)
+                        .ToDictionary(kvp => kvp.Key, kvp => kvp.Value!);
+                    await ValidateEntryData(new Dictionary<string, object?>(), relationValues, collectionFields, mutationDb, collectionId, excludeEntryId: entryId);
+
+                    foreach (var (fieldId, targetIdStr) in relationChanges)
+                    {
+                        var existing = existingRelations.FirstOrDefault(er => er.FieldId == fieldId);
+
+                        if (targetIdStr is null)
+                        {
+                            // Remove relation
+                            if (existing is not null)
+                                mutationDb.EntryRelations.Remove(existing);
+                        }
+                        else if (Guid.TryParse(targetIdStr, out var targetId))
+                        {
+                            if (existing is not null)
+                            {
+                                // Update existing relation
+                                existing.TargetEntryId = targetId;
+                            }
+                            else
+                            {
+                                // Add new relation
+                                mutationDb.EntryRelations.Add(new EntryRelation
+                                {
+                                    EntryId = entryId,
+                                    FieldId = fieldId,
+                                    TargetEntryId = targetId
+                                });
+                            }
+                        }
+                    }
+                }
+
+                entry.UpdatedAt = DateTime.UtcNow;
+                await mutationDb.SaveChangesAsync();
+
+                return entry;
+            };
+
+            collectionMutationsTypeDef.Fields.Add(updateFieldDef);
+
+            // ── delete mutation ──
+            var deleteFieldDef = new ObjectFieldDefinition(
+                "delete",
+                $"Soft-delete an entry in the '{collection.Name}' collection",
+                TypeReference.Parse($"{entryTypeName}!"));
+
+            deleteFieldDef.Arguments.Add(new ArgumentDefinition(
+                "id", "Entry ID to delete", TypeReference.Parse("ID!")));
+
+            deleteFieldDef.Resolver = async ctx =>
+            {
+                using var mutationScope = _scopeFactory.CreateScope();
+                var mutationDb = mutationScope.ServiceProvider.GetRequiredService<TechtonicCmsDbContext>();
+                var abacService = mutationScope.ServiceProvider.GetRequiredService<AbacService>();
+                var httpContextAccessor = mutationScope.ServiceProvider.GetRequiredService<IHttpContextAccessor>();
+
+                var userId = GetUserId(httpContextAccessor);
+                await abacService.RequirePermissionAsync(userId, BaseResource.Entries, PermissionAction.Delete);
+
+                var idStr = ctx.ArgumentValue<string>("id");
+                if (!Guid.TryParse(idStr, out var entryId))
+                    throw new GraphQLException(ErrorBuilder.New()
+                        .SetMessage("Invalid entry ID")
+                        .SetCode("BAD_REQUEST")
+                        .Build());
+
+                var entry = await mutationDb.Entries.FirstOrDefaultAsync(e =>
+                    e.Id == entryId && e.CollectionId == collectionId);
+
+                if (entry is null)
+                    throw new GraphQLException(ErrorBuilder.New()
+                        .SetMessage("Entry not found")
+                        .SetCode("NOT_FOUND")
+                        .Build());
+
+                entry.Status = EntryStatus.Deleted;
+                entry.UpdatedAt = DateTime.UtcNow;
+                await mutationDb.SaveChangesAsync();
+
+                return entry;
+            };
+
+            collectionMutationsTypeDef.Fields.Add(deleteFieldDef);
+
+            // ── publish mutation ──
+            var publishFieldDef = new ObjectFieldDefinition(
+                "publish",
+                $"Publish an entry in the '{collection.Name}' collection",
+                TypeReference.Parse($"{entryTypeName}!"));
+
+            publishFieldDef.Arguments.Add(new ArgumentDefinition(
+                "id", "Entry ID to publish", TypeReference.Parse("ID!")));
+
+            publishFieldDef.Resolver = async ctx =>
+            {
+                using var mutationScope = _scopeFactory.CreateScope();
+                var mutationDb = mutationScope.ServiceProvider.GetRequiredService<TechtonicCmsDbContext>();
+                var abacService = mutationScope.ServiceProvider.GetRequiredService<AbacService>();
+                var httpContextAccessor = mutationScope.ServiceProvider.GetRequiredService<IHttpContextAccessor>();
+
+                var userId = GetUserId(httpContextAccessor);
+                await abacService.RequirePermissionAsync(userId, BaseResource.Entries, PermissionAction.Publish);
+
+                var idStr = ctx.ArgumentValue<string>("id");
+                if (!Guid.TryParse(idStr, out var entryId))
+                    throw new GraphQLException(ErrorBuilder.New()
+                        .SetMessage("Invalid entry ID")
+                        .SetCode("BAD_REQUEST")
+                        .Build());
+
+                var entry = await mutationDb.Entries.FirstOrDefaultAsync(e =>
+                    e.Id == entryId && e.CollectionId == collectionId);
+
+                if (entry is null)
+                    throw new GraphQLException(ErrorBuilder.New()
+                        .SetMessage("Entry not found")
+                        .SetCode("NOT_FOUND")
+                        .Build());
+
+                entry.Status = EntryStatus.Published;
+                entry.PublishedAt = DateTime.UtcNow;
+                entry.UpdatedAt = DateTime.UtcNow;
+                await mutationDb.SaveChangesAsync();
+
+                return entry;
+            };
+
+            collectionMutationsTypeDef.Fields.Add(publishFieldDef);
+
+            types.Add(ObjectType.CreateUnsafe(collectionMutationsTypeDef));
+
+            // Add field on DynamicCollectionsMutations pointing to this collection's mutation type
+            dynamicCollectionsMutationsTypeDef.Fields.Add(new ObjectFieldDefinition(
+                camelName,
+                $"Mutations for the '{collection.Name}' collection",
+                TypeReference.Parse($"{collectionMutationsTypeName}!"),
+                pureResolver: _ => new Dictionary<string, object>()));
+        }
+
+        // Wire dynamicCollections field on Mutation root
+        var mutationExtensionDef = new ObjectTypeDefinition("Mutation")
+        {
+            IsExtension = true
+        };
+
+        mutationExtensionDef.Fields.Add(new ObjectFieldDefinition(
+            "dynamicCollections",
+            "Mutations for all dynamic collections",
+            TypeReference.Parse("DynamicCollectionsMutations!"),
+            pureResolver: _ => new Dictionary<string, object>()));
+
+        types.Add(ObjectTypeExtension.CreateUnsafe(mutationExtensionDef));
+
         return types;
     }
 
@@ -300,6 +775,7 @@ public class CollectionTypeModule : TypeModule
     /// Adds a dynamic jsonb field to the filter descriptor based on the field's <see cref="FieldDataType"/>.
     /// Uses <see cref="CmsDbFunctions"/> methods as lambda expressions so EF Core translates them to
     /// PostgreSQL <c>cms_extract_*</c> SQL functions.
+    /// Relation fields are excluded — they are resolved via the <c>entry_relations</c> join table.
     /// </summary>
     private static void AddDynamicFilterField(IFilterInputTypeDescriptor<Entry> filterDesc, Field field)
     {
@@ -310,7 +786,6 @@ public class CollectionTypeModule : TypeModule
             case FieldDataType.Text:
             case FieldDataType.Asset:
             case FieldDataType.Object:
-            case FieldDataType.Relation:
                 filterDesc.Field(e => CmsDbFunctions.CmsExtractText(e.Data, fieldName))
                     .Name(fieldName);
                 break;
@@ -329,6 +804,9 @@ public class CollectionTypeModule : TypeModule
                 filterDesc.Field(e => CmsDbFunctions.CmsExtractDateTime(e.Data, fieldName))
                     .Name(fieldName);
                 break;
+
+            // Relation fields are stored in entry_relations, not JSONB — skip JSONB filter
+            case FieldDataType.Relation:
             default:
                 break;
         }
@@ -338,6 +816,7 @@ public class CollectionTypeModule : TypeModule
     /// Adds a dynamic jsonb field to the sort descriptor based on the field's <see cref="FieldDataType"/>.
     /// Uses <see cref="CmsDbFunctions"/> methods as lambda expressions so EF Core translates them to
     /// PostgreSQL <c>cms_extract_*</c> SQL functions.
+    /// Relation fields are excluded — they are resolved via the <c>entry_relations</c> join table.
     /// </summary>
     private static void AddDynamicSortField(ISortInputTypeDescriptor<Entry> sortDesc, Field field)
     {
@@ -348,7 +827,6 @@ public class CollectionTypeModule : TypeModule
             case FieldDataType.Text:
             case FieldDataType.Asset:
             case FieldDataType.Object:
-            case FieldDataType.Relation:
                 sortDesc.Field(e => CmsDbFunctions.CmsExtractText(e.Data, fieldName))
                     .Name(fieldName);
                 break;
@@ -367,8 +845,101 @@ public class CollectionTypeModule : TypeModule
                 sortDesc.Field(e => CmsDbFunctions.CmsExtractDateTime(e.Data, fieldName))
                     .Name(fieldName);
                 break;
+
+            // Relation fields are stored in entry_relations, not JSONB — skip JSONB sort
+            case FieldDataType.Relation:
             default:
                 break;
         }
+    }
+
+    private static Guid GetUserId(IHttpContextAccessor httpContextAccessor)
+    {
+        var user = httpContextAccessor.HttpContext?.User;
+        if (user is null)
+            throw new GraphQLException(ErrorBuilder.New()
+                .SetMessage("No authenticated user found")
+                .SetCode("UNAUTHENTICATED")
+                .Build());
+
+        var userIdClaim = user.FindFirst("userId")?.Value
+            ?? user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        if (userIdClaim is null || !Guid.TryParse(userIdClaim, out var userId))
+            throw new GraphQLException(ErrorBuilder.New()
+                .SetMessage("Invalid or missing user identity")
+                .SetCode("UNAUTHENTICATED")
+                .Build());
+
+        return userId;
+    }
+
+    private static async Task ValidateEntryData(
+        Dictionary<string, object?> scalarData,
+        Dictionary<Guid, string> relationValues,
+        List<Field> collectionFields,
+        TechtonicCmsDbContext db,
+        Guid collectionId,
+        Guid? excludeEntryId)
+    {
+        // Validate unique constraints on scalar fields
+        var uniqueFields = collectionFields.Where(f => f.IsUnique && f.DataType != FieldDataType.Relation).ToList();
+        foreach (var field in uniqueFields)
+        {
+            if (!scalarData.TryGetValue(field.Name, out var value) || value is null)
+                continue;
+
+            var valueStr = value.ToString()!;
+            var query = db.Entries.Where(e =>
+                e.CollectionId == collectionId &&
+                e.Data.RootElement.GetProperty(field.Name).GetString() == valueStr);
+
+            if (excludeEntryId.HasValue)
+                query = query.Where(e => e.Id != excludeEntryId.Value);
+
+            if (await query.AnyAsync())
+                throw new GraphQLException(ErrorBuilder.New()
+                    .SetMessage($"Value '{valueStr}' for field '{field.Name}' already exists in this collection")
+                    .SetCode("CONFLICT")
+                    .Build());
+        }
+
+        // Validate relation targets exist in their respective collections
+        var relationFields = collectionFields.Where(f =>
+            f.DataType == FieldDataType.Relation && f.RelatedCollectionId.HasValue).ToList();
+
+        foreach (var field in relationFields)
+        {
+            if (!relationValues.TryGetValue(field.Id, out var relIdStr))
+                continue;
+
+            if (!Guid.TryParse(relIdStr, out var relId))
+                throw new GraphQLException(ErrorBuilder.New()
+                    .SetMessage($"Invalid relation ID '{relIdStr}' for field '{field.Name}'")
+                    .SetCode("BAD_REQUEST")
+                    .Build());
+
+            var relatedExists = await db.Entries.AnyAsync(e =>
+                e.Id == relId && e.CollectionId == field.RelatedCollectionId!.Value);
+
+            if (!relatedExists)
+                throw new GraphQLException(ErrorBuilder.New()
+                    .SetMessage($"Related entry '{relIdStr}' not found in collection")
+                    .SetCode("NOT_FOUND")
+                    .Build());
+        }
+    }
+
+    private static string GenerateSlug(string name)
+    {
+        var slug = name.Trim().ToLowerInvariant();
+        slug = System.Text.RegularExpressions.Regex.Replace(slug, @"[^a-z0-9]+", "-");
+        slug = System.Text.RegularExpressions.Regex.Replace(slug, @"^-+|-+$", "");
+        slug = slug.Trim('-');
+
+        if (string.IsNullOrWhiteSpace(slug))
+            slug = Guid.NewGuid().ToString("N")[..8];
+
+        return slug;
     }
 }

@@ -62,15 +62,8 @@ public class Field
 
     public Collection? RelatedCollection { get; set; }
 
-    /* public ICollection<EntryRelation> EntryRelations { get; set; } = new List<EntryRelation>();
-     public ICollection<EntryTypstText> EntryTypstTexts { get; set; } = new List<EntryTypstText>();
-     public ICollection<EntryText> EntryTexts { get; set; } = new List<EntryText>();
-     public ICollection<EntryBoolean> EntryBooleans { get; set; } = new List<EntryBoolean>();
-     public ICollection<EntryNumber> EntryNumbers { get; set; } = new List<EntryNumber>();
-     public ICollection<EntryDateTime> EntryDateTimes { get; set; } = new List<EntryDateTime>();
-     public ICollection<EntryRichText> EntryRichTexts { get; set; } = new List<EntryRichText>();
-     public ICollection<EntryJsonData> EntryJsonData { get; set; } = new List<EntryJsonData>();
-     public ICollection<EntryAsset> EntryAssets { get; set; } = new List<EntryAsset>();
-     public ICollection<AbacEvaluationCache> EvaluationCaches { get; set; } = new List<AbacEvaluationCache>();
-     public ICollection<AbacAudit> AuditLogs { get; set; } = new List<AbacAudit>(); */
+    /// <summary>
+    /// All relation instances that use this field definition.
+    /// </summary>
+    public ICollection<EntryRelation> EntryRelations { get; set; } = new List<EntryRelation>();
 }

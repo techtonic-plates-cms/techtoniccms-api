@@ -48,6 +48,11 @@ public class CollectionTypeModule : TypeModule
         if (collections.Count == 0)
             return types;
 
+        // Map collection ID → entry type name for relation field resolution
+        var collectionTypeMap = collections.ToDictionary(
+            c => c.Id,
+            c => $"{ToPascalCase(c.Slug)}Entry");
+
         var queryExtensionDef = new ObjectTypeDefinition("CollectionQuery")
         {
             RuntimeType = typeof(CollectionQuery),
@@ -78,13 +83,41 @@ public class CollectionTypeModule : TypeModule
 
             foreach (var field in collection.Fields.OrderBy(f => f.CreatedAt))
             {
-                var graphqlType = MapFieldType(field.DataType);
-                dataTypeDef.Fields.Add(new ObjectFieldDefinition(
-                    field.Name,
-                    field.Description,
-                    TypeReference.Parse(graphqlType),
-                    pureResolver: ctx =>
-                        ctx.Parent<Dictionary<string, object>>().GetValueOrDefault(field.Name)));
+                if (field.DataType == FieldDataType.Relation
+                    && field.RelatedCollectionId.HasValue
+                    && collectionTypeMap.TryGetValue(field.RelatedCollectionId.Value, out var relationTypeName))
+                {
+                    // Relation field: resolve to the target collection's entry type
+                    var relatedCollectionId = field.RelatedCollectionId.Value;
+                    dataTypeDef.Fields.Add(new ObjectFieldDefinition(
+                        field.Name,
+                        field.Description,
+                        TypeReference.Parse(relationTypeName),
+                        resolver: async ctx =>
+                        {
+                            var data = ctx.Parent<Dictionary<string, object>>();
+                            var rawValue = data.GetValueOrDefault(field.Name);
+
+                            if (rawValue is not string guidString || !Guid.TryParse(guidString, out var entryId))
+                                return null;
+
+                            using var relationScope = _scopeFactory.CreateScope();
+                            var relationDb = relationScope.ServiceProvider.GetRequiredService<TechtonicCmsDbContext>();
+
+                            return await relationDb.Entries
+                                .FirstOrDefaultAsync(e => e.Id == entryId);
+                        }));
+                }
+                else
+                {
+                    var graphqlType = MapFieldType(field.DataType);
+                    dataTypeDef.Fields.Add(new ObjectFieldDefinition(
+                        field.Name,
+                        field.Description,
+                        TypeReference.Parse(graphqlType),
+                        pureResolver: ctx =>
+                            ctx.Parent<Dictionary<string, object>>().GetValueOrDefault(field.Name)));
+                }
             }
 
             types.Add(ObjectType.CreateUnsafe(dataTypeDef));

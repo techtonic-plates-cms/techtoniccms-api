@@ -772,10 +772,10 @@ public class CollectionTypeModule : TypeModule
     }
 
     /// <summary>
-    /// Adds a dynamic jsonb field to the filter descriptor based on the field's <see cref="FieldDataType"/>.
-    /// Uses <see cref="CmsDbFunctions"/> methods as lambda expressions so EF Core translates them to
-    /// PostgreSQL <c>cms_extract_*</c> SQL functions.
-    /// Relation fields are excluded — they are resolved via the <c>entry_relations</c> join table.
+    /// Adds a dynamic field to the filter descriptor based on the field's <see cref="FieldDataType"/>.
+    /// Scalar fields use <see cref="CmsDbFunctions"/> JSONB extraction; relation fields use
+    /// <see cref="Entry.FromRelations"/> navigation property subqueries that EF Core translates
+    /// to <c>EXISTS</c> / correlated subselect on <c>entry_relations</c>.
     /// </summary>
     private static void AddDynamicFilterField(IFilterInputTypeDescriptor<Entry> filterDesc, Field field)
     {
@@ -805,18 +805,27 @@ public class CollectionTypeModule : TypeModule
                     .Name(fieldName);
                 break;
 
-            // Relation fields are stored in entry_relations, not JSONB — skip JSONB filter
+            // Relation fields: filter by target entry ID via entry_relations subquery.
+            // EF Core translates this to: WHERE (SELECT r."TargetEntryId" FROM entry_relations r
+            //   WHERE r."EntryId" = e."Id" AND r."FieldId" = @fieldId LIMIT 1) = @value
             case FieldDataType.Relation:
+                var relFieldId = field.Id;
+                filterDesc.Field(e => e.FromRelations
+                        .Where(r => r.FieldId == relFieldId)
+                        .Select(r => r.TargetEntryId)
+                        .FirstOrDefault())
+                    .Name(fieldName);
+                break;
+
             default:
                 break;
         }
     }
 
     /// <summary>
-    /// Adds a dynamic jsonb field to the sort descriptor based on the field's <see cref="FieldDataType"/>.
-    /// Uses <see cref="CmsDbFunctions"/> methods as lambda expressions so EF Core translates them to
-    /// PostgreSQL <c>cms_extract_*</c> SQL functions.
-    /// Relation fields are excluded — they are resolved via the <c>entry_relations</c> join table.
+    /// Adds a dynamic field to the sort descriptor based on the field's <see cref="FieldDataType"/>.
+    /// Scalar fields use <see cref="CmsDbFunctions"/> JSONB extraction; relation fields use
+    /// <see cref="Entry.FromRelations"/> navigation property subqueries to sort by target entry name.
     /// </summary>
     private static void AddDynamicSortField(ISortInputTypeDescriptor<Entry> sortDesc, Field field)
     {
@@ -846,8 +855,19 @@ public class CollectionTypeModule : TypeModule
                     .Name(fieldName);
                 break;
 
-            // Relation fields are stored in entry_relations, not JSONB — skip JSONB sort
+            // Relation fields: sort by target entry name via entry_relations subquery.
+            // EF Core translates: ORDER BY (SELECT r."TargetEntry"."Name" FROM entry_relations r
+            //   JOIN entries AS "TargetEntry" ON r."TargetEntryId" = "TargetEntry"."Id"
+            //   WHERE r."EntryId" = e."Id" AND r."FieldId" = @fieldId LIMIT 1)
             case FieldDataType.Relation:
+                var relFieldId = field.Id;
+                sortDesc.Field(e => e.FromRelations
+                        .Where(r => r.FieldId == relFieldId)
+                        .Select(r => r.TargetEntry.Name)
+                        .FirstOrDefault())
+                    .Name(fieldName);
+                break;
+
             default:
                 break;
         }

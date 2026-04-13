@@ -38,8 +38,7 @@ public static partial class UserRefInRoleType
     [GraphQLType<NonNullType<StringType>>]
     public static string GetName([Parent] UserRefInRoleDto user) => user.Name;
 
-    [GraphQLType<NonNullType<StringType>>]
-    public static string GetStatus([Parent] UserRefInRoleDto user) => user.Status.ToString().ToUpperInvariant();
+    public static UserStatus GetStatus([Parent] UserRefInRoleDto user) => user.Status;
 
     public static string? GetAssignedAt([Parent] UserRefInRoleDto user) =>
         user.AssignedAt?.ToUniversalTime().ToString("o");
@@ -58,14 +57,11 @@ public static partial class PolicyRefInRoleType
 
     public static string? GetDescription([Parent] PolicyRefInRoleDto policy) => policy.Description;
 
-    [GraphQLType<NonNullType<StringType>>]
-    public static string GetEffect([Parent] PolicyRefInRoleDto policy) => policy.Effect.ToString().ToUpperInvariant();
+    public static PermissionEffect GetEffect([Parent] PolicyRefInRoleDto policy) => policy.Effect;
 
-    [GraphQLType<NonNullType<StringType>>]
-    public static string GetResourceType([Parent] PolicyRefInRoleDto policy) => policy.ResourceType.ToString().ToUpperInvariant();
+    public static BaseResource GetResourceType([Parent] PolicyRefInRoleDto policy) => policy.ResourceType;
 
-    [GraphQLType<NonNullType<StringType>>]
-    public static string GetActionType([Parent] PolicyRefInRoleDto policy) => policy.ActionType.ToString().ToUpperInvariant();
+    public static PermissionAction GetActionType([Parent] PolicyRefInRoleDto policy) => policy.ActionType;
 
     public static string? GetAssignedAt([Parent] PolicyRefInRoleDto policy) =>
         policy.AssignedAt?.ToUniversalTime().ToString("o");

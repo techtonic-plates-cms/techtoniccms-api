@@ -6,6 +6,7 @@ using TechtonicCmsApi.Contexts;
 using TechtonicCmsApi.Schema.TechtonicCms;
 using TechtonicCmsApi.Schema.TechtonicCms.Entities;
 using TechtonicCmsApi.Schema.TechtonicCms.Enums;
+using EntryStatus = TechtonicCmsApi.Schema.TechtonicCms.Enums.EntryStatus;
 
 namespace TechtonicCmsApi.Types.Users;
 
@@ -43,7 +44,7 @@ public static partial class UserType
     [GraphQLType<NonNullType<StringType>>]
     public static string GetName([Parent] User user) => user.Name;
 
-    public static string GetStatus([Parent] User user) => user.Status.ToString().ToUpperInvariant();
+    public static UserStatus GetStatus([Parent] User user) => user.Status;
 
     public static string? GetCreationTime([Parent] User user) =>
         user.CreationTime.ToUniversalTime().ToString("o");

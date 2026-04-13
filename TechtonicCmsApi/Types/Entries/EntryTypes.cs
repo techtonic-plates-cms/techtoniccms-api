@@ -5,6 +5,7 @@ using HotChocolate.Types;
 using Microsoft.EntityFrameworkCore;
 using TechtonicCmsApi.Contexts;
 using TechtonicCmsApi.Schema.TechtonicCms.Entities;
+using TechtonicCmsApi.Schema.TechtonicCms.Enums;
 
 namespace TechtonicCmsApi.Types.Entries;
 
@@ -18,14 +19,11 @@ public static partial class EntryType
 
     public static string? GetSlug([Parent] Entry entry) => entry.Slug;
 
-    [GraphQLType<NonNullType<StringType>>]
-    public static string GetStatus([Parent] Entry entry) => entry.Status.ToString().ToUpperInvariant();
+    public static EntryStatus GetStatus([Parent] Entry entry) => entry.Status;
 
-    [GraphQLType<NonNullType<StringType>>]
-    public static string GetLocale([Parent] Entry entry) => entry.Locale.ToString().ToUpperInvariant();
+    public static Locale GetLocale([Parent] Entry entry) => entry.Locale;
 
-    [GraphQLType<NonNullType<StringType>>]
-    public static string GetDefaultLocale([Parent] Entry entry) => entry.DefaultLocale.ToString().ToUpperInvariant();
+    public static Locale GetDefaultLocale([Parent] Entry entry) => entry.DefaultLocale;
 
     [GraphQLType<NonNullType<StringType>>]
     public static string GetData([Parent] Entry entry) => entry.Data.RootElement.GetRawText();

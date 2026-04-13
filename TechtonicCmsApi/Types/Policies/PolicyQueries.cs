@@ -5,6 +5,7 @@ using HotChocolate.Types;
 using Microsoft.EntityFrameworkCore;
 using TechtonicCmsApi.Contexts;
 using TechtonicCmsApi.Schema.TechtonicCms;
+using TechtonicCmsApi.Schema.TechtonicCms.Enums;
 
 using PolicyEntity = TechtonicCmsApi.Schema.TechtonicCms.Entities.AbacPolicy;
 
@@ -37,9 +38,9 @@ public class PolicyQuery
     [Authorize(Policy = "Users:Read")]
     public async Task<IEnumerable<PolicyEntity>> Policies(
         string? search,
-        string? resourceType,
-        string? actionType,
-        string? effect,
+        BaseResource? resourceType,
+        PermissionAction? actionType,
+        PermissionEffect? effect,
         bool? isActive,
         int? limit,
         int? offset,
@@ -52,28 +53,19 @@ public class PolicyQuery
             query = query.Where(p => p.Name.Contains(search));
         }
 
-        if (!string.IsNullOrEmpty(resourceType))
+        if (resourceType.HasValue)
         {
-            if (Enum.TryParse<Schema.TechtonicCms.Enums.BaseResource>(resourceType, true, out var resourceTypeEnum))
-            {
-                query = query.Where(p => p.ResourceType == resourceTypeEnum);
-            }
+            query = query.Where(p => p.ResourceType == resourceType.Value);
         }
 
-        if (!string.IsNullOrEmpty(actionType))
+        if (actionType.HasValue)
         {
-            if (Enum.TryParse<Schema.TechtonicCms.Enums.PermissionAction>(actionType, true, out var actionTypeEnum))
-            {
-                query = query.Where(p => p.ActionType == actionTypeEnum);
-            }
+            query = query.Where(p => p.ActionType == actionType.Value);
         }
 
-        if (!string.IsNullOrEmpty(effect))
+        if (effect.HasValue)
         {
-            if (Enum.TryParse<Schema.TechtonicCms.Enums.PermissionEffect>(effect, true, out var effectEnum))
-            {
-                query = query.Where(p => p.Effect == effectEnum);
-            }
+            query = query.Where(p => p.Effect == effect.Value);
         }
 
         if (isActive.HasValue)

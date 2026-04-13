@@ -160,7 +160,7 @@ public class CollectionTypeModule : TypeModule
             entryTypeDef.Fields.Add(new ObjectFieldDefinition(
                 "status",
                 "Entry status",
-                TypeReference.Parse("String!"),
+                TypeReference.Parse("EntryStatus!"),
                 pureResolver: ctx => ctx.Parent<Entry>().Status));
 
             entryTypeDef.Fields.Add(new ObjectFieldDefinition(
@@ -378,10 +378,10 @@ public class CollectionTypeModule : TypeModule
                 "slug", "URL-friendly identifier (auto-generated if omitted)", TypeReference.Parse("String")));
 
             createFieldDef.Arguments.Add(new ArgumentDefinition(
-                "locale", "Entry locale (defaults to collection default)", TypeReference.Parse("String")));
+                "locale", "Entry locale (defaults to collection default)", TypeReference.Parse("Locale")));
 
             createFieldDef.Arguments.Add(new ArgumentDefinition(
-                "status", "Entry status (defaults to DRAFT)", TypeReference.Parse("String")));
+                "status", "Entry status (defaults to DRAFT)", TypeReference.Parse("EntryStatus")));
 
             createFieldDef.Arguments.Add(new ArgumentDefinition(
                 "data", $"Dynamic data for the '{collection.Name}' collection",
@@ -398,8 +398,8 @@ public class CollectionTypeModule : TypeModule
 
                 var name = ctx.ArgumentValue<string>("name");
                 var slug = ctx.ArgumentValue<string>("slug");
-                var localeStr = ctx.ArgumentValue<string>("locale");
-                var statusStr = ctx.ArgumentValue<string>("status");
+                var localeArg = ctx.ArgumentValue<Locale?>("locale");
+                var statusArg = ctx.ArgumentValue<EntryStatus?>("status");
                 var data = ctx.ArgumentValue<Dictionary<string, object?>>("data")
                     ?? new Dictionary<string, object?>();
 
@@ -473,13 +473,9 @@ public class CollectionTypeModule : TypeModule
                 if (slugConflict)
                     entrySlug = $"{entrySlug}-{Guid.NewGuid().ToString("N")[..8]}";
 
-                Locale locale = collection.DefaultLocale;
-                if (localeStr is not null && Enum.TryParse<Locale>(localeStr, true, out var parsedLocale))
-                    locale = parsedLocale;
+                Locale locale = localeArg ?? collection.DefaultLocale;
 
-                EntryStatus status = EntryStatus.Draft;
-                if (statusStr is not null && Enum.TryParse<EntryStatus>(statusStr, true, out var parsedStatus))
-                    status = parsedStatus;
+                EntryStatus status = statusArg ?? EntryStatus.Draft;
 
                 var now = DateTime.UtcNow;
                 var json = JsonSerializer.Serialize(scalarData.Where(kvp => kvp.Value is not null)
@@ -540,10 +536,10 @@ public class CollectionTypeModule : TypeModule
                 "slug", "New URL-friendly identifier", TypeReference.Parse("String")));
 
             updateFieldDef.Arguments.Add(new ArgumentDefinition(
-                "locale", "New locale", TypeReference.Parse("String")));
+                "locale", "New locale", TypeReference.Parse("Locale")));
 
             updateFieldDef.Arguments.Add(new ArgumentDefinition(
-                "status", "New status", TypeReference.Parse("String")));
+                "status", "New status", TypeReference.Parse("EntryStatus")));
 
             updateFieldDef.Arguments.Add(new ArgumentDefinition(
                 "data", $"Dynamic data for the '{collection.Name}' collection (partial update)",
@@ -576,8 +572,8 @@ public class CollectionTypeModule : TypeModule
 
                 var name = ctx.ArgumentValue<string>("name");
                 var slug = ctx.ArgumentValue<string>("slug");
-                var localeStr = ctx.ArgumentValue<string>("locale");
-                var statusStr = ctx.ArgumentValue<string>("status");
+                var localeArg = ctx.ArgumentValue<Locale?>("locale");
+                var statusArg = ctx.ArgumentValue<EntryStatus?>("status");
                 var data = ctx.ArgumentValue<Dictionary<string, object?>?>("data")
                     ?? new Dictionary<string, object?>();
 
@@ -593,12 +589,12 @@ public class CollectionTypeModule : TypeModule
                             .Build());
                     entry.Slug = slug;
                 }
-                if (localeStr is not null && Enum.TryParse<Locale>(localeStr, true, out var parsedLocale))
-                    entry.Locale = parsedLocale;
-                if (statusStr is not null && Enum.TryParse<EntryStatus>(statusStr, true, out var parsedStatus))
+                if (localeArg.HasValue)
+                    entry.Locale = localeArg.Value;
+                if (statusArg.HasValue)
                 {
-                    entry.Status = parsedStatus;
-                    if (parsedStatus == EntryStatus.Published && entry.PublishedAt is null)
+                    entry.Status = statusArg.Value;
+                    if (statusArg.Value == EntryStatus.Published && entry.PublishedAt is null)
                         entry.PublishedAt = DateTime.UtcNow;
                 }
 

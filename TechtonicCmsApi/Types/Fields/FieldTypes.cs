@@ -4,6 +4,7 @@ using HotChocolate.Types;
 using Microsoft.EntityFrameworkCore;
 using TechtonicCmsApi.Contexts;
 using TechtonicCmsApi.Schema.TechtonicCms.Entities;
+using TechtonicCmsApi.Schema.TechtonicCms.Enums;
 
 namespace TechtonicCmsApi.Types.Fields;
 
@@ -21,8 +22,7 @@ public static partial class FieldType
 
     public static string? GetDescription([Parent] Field field) => field.Description;
 
-    [GraphQLType<NonNullType<StringType>>]
-    public static string GetDataType([Parent] Field field) => field.DataType.ToString().ToUpperInvariant();
+    public static FieldDataType GetDataType([Parent] Field field) => field.DataType;
 
     public static bool GetIsRequired([Parent] Field field) => field.IsRequired;
 

@@ -14,17 +14,17 @@ namespace TechtonicCmsApi.Types.Policies;
 
 public class CreatePolicyRuleInput
 {
-    [GraphQLType<NonNullType<StringType>>]
-    public string AttributePath { get; set; } = "";
+    [GraphQLType<NonNullType<EnumType<AttributePath>>>]
+    public AttributePath AttributePath { get; set; }
 
-    [GraphQLType<NonNullType<StringType>>]
-    public string Operator { get; set; } = "";
+    [GraphQLType<NonNullType<EnumType<OperatorType>>>]
+    public OperatorType Operator { get; set; }
 
     [GraphQLType<NonNullType<StringType>>]
     public string ExpectedValue { get; set; } = "";
 
-    [GraphQLType<NonNullType<StringType>>]
-    public string ValueType { get; set; } = "";
+    [GraphQLType<NonNullType<EnumType<Schema.TechtonicCms.Enums.ValueType>>>]
+    public Schema.TechtonicCms.Enums.ValueType ValueType { get; set; }
 
     public string? Description { get; set; }
 
@@ -40,21 +40,21 @@ public class CreatePolicyInput
 
     public string? Description { get; set; }
 
-    [GraphQLType<NonNullType<StringType>>]
-    public string Effect { get; set; } = "";
+    [GraphQLType<NonNullType<EnumType<PermissionEffect>>>]
+    public PermissionEffect Effect { get; set; }
 
-    [GraphQLType<NonNullType<StringType>>]
-    public string ResourceType { get; set; } = "";
+    [GraphQLType<NonNullType<EnumType<BaseResource>>>]
+    public BaseResource ResourceType { get; set; }
 
-    [GraphQLType<NonNullType<StringType>>]
-    public string ActionType { get; set; } = "";
+    [GraphQLType<NonNullType<EnumType<PermissionAction>>>]
+    public PermissionAction ActionType { get; set; }
 
     public int? Priority { get; set; }
 
     public bool? IsActive { get; set; }
 
-    [GraphQLType<NonNullType<StringType>>]
-    public string RuleConnector { get; set; } = "";
+    [GraphQLType<NonNullType<EnumType<LogicalOperator>>>]
+    public LogicalOperator RuleConnector { get; set; }
 
     public CreatePolicyRuleInput[]? Rules { get; set; }
 }
@@ -63,17 +63,17 @@ public class UpdatePolicyRuleInput
 {
     public Guid? Id { get; set; }
 
-    [GraphQLType<NonNullType<StringType>>]
-    public string AttributePath { get; set; } = "";
+    [GraphQLType<NonNullType<EnumType<AttributePath>>>]
+    public AttributePath AttributePath { get; set; }
 
-    [GraphQLType<NonNullType<StringType>>]
-    public string Operator { get; set; } = "";
+    [GraphQLType<NonNullType<EnumType<OperatorType>>>]
+    public OperatorType Operator { get; set; }
 
     [GraphQLType<NonNullType<StringType>>]
     public string ExpectedValue { get; set; } = "";
 
-    [GraphQLType<NonNullType<StringType>>]
-    public string ValueType { get; set; } = "";
+    [GraphQLType<NonNullType<EnumType<Schema.TechtonicCms.Enums.ValueType>>>]
+    public Schema.TechtonicCms.Enums.ValueType ValueType { get; set; }
 
     public string? Description { get; set; }
 
@@ -91,13 +91,13 @@ public class UpdatePolicyInput
 
     public string? Description { get; set; }
 
-    public string? Effect { get; set; }
+    public PermissionEffect? Effect { get; set; }
 
     public int? Priority { get; set; }
 
     public bool? IsActive { get; set; }
 
-    public string? RuleConnector { get; set; }
+    public LogicalOperator? RuleConnector { get; set; }
 
     public UpdatePolicyRuleInput[]? Rules { get; set; }
 
@@ -127,50 +127,18 @@ public class PolicyMutation
     {
         var currentUserId = GetUserId(httpContextAccessor);
 
-        if (!Enum.TryParse<PermissionEffect>(input.Effect, true, out var effectEnum))
-        {
-            throw new GraphQLException(ErrorBuilder.New()
-                .SetMessage($"Invalid permission effect: {input.Effect}")
-                .SetCode("INVALID_ENUM")
-                .Build());
-        }
-
-        if (!Enum.TryParse<BaseResource>(input.ResourceType, true, out var resourceTypeEnum))
-        {
-            throw new GraphQLException(ErrorBuilder.New()
-                .SetMessage($"Invalid resource type: {input.ResourceType}")
-                .SetCode("INVALID_ENUM")
-                .Build());
-        }
-
-        if (!Enum.TryParse<PermissionAction>(input.ActionType, true, out var actionTypeEnum))
-        {
-            throw new GraphQLException(ErrorBuilder.New()
-                .SetMessage($"Invalid permission action: {input.ActionType}")
-                .SetCode("INVALID_ENUM")
-                .Build());
-        }
-
-        if (!Enum.TryParse<LogicalOperator>(input.RuleConnector, true, out var ruleConnectorEnum))
-        {
-            throw new GraphQLException(ErrorBuilder.New()
-                .SetMessage($"Invalid logical operator: {input.RuleConnector}")
-                .SetCode("INVALID_ENUM")
-                .Build());
-        }
-
         var now = DateTime.UtcNow;
         var policy = new PolicyEntity
         {
             Id = Guid.NewGuid(),
             Name = input.Name,
             Description = input.Description,
-            Effect = effectEnum,
-            ResourceType = resourceTypeEnum,
-            ActionType = actionTypeEnum,
+            Effect = input.Effect,
+            ResourceType = input.ResourceType,
+            ActionType = input.ActionType,
             Priority = input.Priority ?? 100,
             IsActive = input.IsActive ?? true,
-            RuleConnector = ruleConnectorEnum,
+            RuleConnector = input.RuleConnector,
             CreatedBy = currentUserId,
             CreatedAt = now,
             UpdatedAt = now
@@ -185,38 +153,14 @@ public class PolicyMutation
             {
                 var ruleInput = input.Rules[i];
 
-                if (!Enum.TryParse<AttributePath>(ruleInput.AttributePath, true, out var attributePathEnum))
-                {
-                    throw new GraphQLException(ErrorBuilder.New()
-                        .SetMessage($"Invalid attribute path: {ruleInput.AttributePath}")
-                        .SetCode("INVALID_ENUM")
-                        .Build());
-                }
-
-                if (!Enum.TryParse<OperatorType>(ruleInput.Operator, true, out var operatorEnum))
-                {
-                    throw new GraphQLException(ErrorBuilder.New()
-                        .SetMessage($"Invalid operator: {ruleInput.Operator}")
-                        .SetCode("INVALID_ENUM")
-                        .Build());
-                }
-
-                if (!Enum.TryParse<Schema.TechtonicCms.Enums.ValueType>(ruleInput.ValueType, true, out var valueTypeEnum))
-                {
-                    throw new GraphQLException(ErrorBuilder.New()
-                        .SetMessage($"Invalid value type: {ruleInput.ValueType}")
-                        .SetCode("INVALID_ENUM")
-                        .Build());
-                }
-
                 var rule = new AbacPolicyRule
                 {
                     Id = Guid.NewGuid(),
                     PolicyId = policy.Id,
-                    AttributePath = attributePathEnum,
-                    Operator = operatorEnum,
+                    AttributePath = ruleInput.AttributePath,
+                    Operator = ruleInput.Operator,
                     ExpectedValue = ruleInput.ExpectedValue,
-                    ValueType = valueTypeEnum,
+                    ValueType = ruleInput.ValueType,
                     Description = ruleInput.Description,
                     IsActive = ruleInput.IsActive ?? true,
                     Order = ruleInput.Order ?? i,
@@ -256,17 +200,9 @@ public class PolicyMutation
             policy.Description = input.Description;
         }
 
-        if (input.Effect is not null)
+        if (input.Effect.HasValue)
         {
-            if (!Enum.TryParse<PermissionEffect>(input.Effect, true, out var effectEnum))
-            {
-                throw new GraphQLException(ErrorBuilder.New()
-                    .SetMessage($"Invalid permission effect: {input.Effect}")
-                    .SetCode("INVALID_ENUM")
-                    .Build());
-            }
-
-            policy.Effect = effectEnum;
+            policy.Effect = input.Effect.Value;
         }
 
         if (input.Priority.HasValue)
@@ -279,17 +215,9 @@ public class PolicyMutation
             policy.IsActive = input.IsActive.Value;
         }
 
-        if (input.RuleConnector is not null)
+        if (input.RuleConnector.HasValue)
         {
-            if (!Enum.TryParse<LogicalOperator>(input.RuleConnector, true, out var ruleConnectorEnum))
-            {
-                throw new GraphQLException(ErrorBuilder.New()
-                    .SetMessage($"Invalid logical operator: {input.RuleConnector}")
-                    .SetCode("INVALID_ENUM")
-                    .Build());
-            }
-
-            policy.RuleConnector = ruleConnectorEnum;
+            policy.RuleConnector = input.RuleConnector.Value;
         }
 
         policy.UpdatedAt = DateTime.UtcNow;
@@ -309,30 +237,6 @@ public class PolicyMutation
         {
             foreach (var ruleInput in input.Rules)
             {
-                if (!Enum.TryParse<AttributePath>(ruleInput.AttributePath, true, out var attributePathEnum))
-                {
-                    throw new GraphQLException(ErrorBuilder.New()
-                        .SetMessage($"Invalid attribute path: {ruleInput.AttributePath}")
-                        .SetCode("INVALID_ENUM")
-                        .Build());
-                }
-
-                if (!Enum.TryParse<OperatorType>(ruleInput.Operator, true, out var operatorEnum))
-                {
-                    throw new GraphQLException(ErrorBuilder.New()
-                        .SetMessage($"Invalid operator: {ruleInput.Operator}")
-                        .SetCode("INVALID_ENUM")
-                        .Build());
-                }
-
-                if (!Enum.TryParse<Schema.TechtonicCms.Enums.ValueType>(ruleInput.ValueType, true, out var valueTypeEnum))
-                {
-                    throw new GraphQLException(ErrorBuilder.New()
-                        .SetMessage($"Invalid value type: {ruleInput.ValueType}")
-                        .SetCode("INVALID_ENUM")
-                        .Build());
-                }
-
                 if (ruleInput.Id.HasValue)
                 {
                     var existingRule = await db.AbacPolicyRules
@@ -340,10 +244,10 @@ public class PolicyMutation
 
                     if (existingRule is not null)
                     {
-                        existingRule.AttributePath = attributePathEnum;
-                        existingRule.Operator = operatorEnum;
+                        existingRule.AttributePath = ruleInput.AttributePath;
+                        existingRule.Operator = ruleInput.Operator;
                         existingRule.ExpectedValue = ruleInput.ExpectedValue;
-                        existingRule.ValueType = valueTypeEnum;
+                        existingRule.ValueType = ruleInput.ValueType;
                         existingRule.Description = ruleInput.Description;
                         existingRule.IsActive = ruleInput.IsActive ?? true;
                         existingRule.Order = ruleInput.Order ?? 0;
@@ -355,10 +259,10 @@ public class PolicyMutation
                     {
                         Id = Guid.NewGuid(),
                         PolicyId = policy.Id,
-                        AttributePath = attributePathEnum,
-                        Operator = operatorEnum,
+                        AttributePath = ruleInput.AttributePath,
+                        Operator = ruleInput.Operator,
                         ExpectedValue = ruleInput.ExpectedValue,
-                        ValueType = valueTypeEnum,
+                        ValueType = ruleInput.ValueType,
                         Description = ruleInput.Description,
                         IsActive = ruleInput.IsActive ?? true,
                         Order = ruleInput.Order ?? 0,

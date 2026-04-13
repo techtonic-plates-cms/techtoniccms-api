@@ -111,9 +111,9 @@ public class CreateCollectionInput
 
     public string? Color { get; set; }
 
-    public string? DefaultLocale { get; set; }
+    public Locale? DefaultLocale { get; set; }
 
-    public string[]? SupportedLocales { get; set; }
+    public Locale[]? SupportedLocales { get; set; }
 
     public bool? IsLocalized { get; set; }
 
@@ -135,9 +135,9 @@ public class UpdateCollectionInput
 
     public string? Color { get; set; }
 
-    public string? DefaultLocale { get; set; }
+    public Locale? DefaultLocale { get; set; }
 
-    public string[]? SupportedLocales { get; set; }
+    public Locale[]? SupportedLocales { get; set; }
 
     public bool? IsLocalized { get; set; }
 
@@ -145,7 +145,6 @@ public class UpdateCollectionInput
 
     public Guid[]? DeleteFieldIds { get; set; }
 }
-
 public class CollectionMutation
 {
     [Authorize(Policy = "Collections:Create")]
@@ -166,12 +165,9 @@ public class CollectionMutation
                 .SetCode("CONFLICT")
                 .Build());
 
-        Locale defaultLocale = Locale.En;
-        if (!string.IsNullOrEmpty(input.DefaultLocale) &&
-            Enum.TryParse<Locale>(input.DefaultLocale, true, out var parsedLocale))
-            defaultLocale = parsedLocale;
+        Locale defaultLocale = input.DefaultLocale ?? Locale.En;
 
-        var supportedLocales = input.SupportedLocales ?? ["en"];
+        var supportedLocales = input.SupportedLocales?.Select(l => l).ToArray() ?? [Locale.En];
         var now = DateTime.UtcNow;
 
         var collection = new Collection
@@ -183,7 +179,7 @@ public class CollectionMutation
             Icon = input.Icon,
             Color = input.Color,
             DefaultLocale = defaultLocale,
-            SupportedLocales = supportedLocales,
+            SupportedLocales = supportedLocales.Select(l => l.ToString()).ToArray(),
             IsLocalized = input.IsLocalized ?? false,
             CreatedBy = userId,
             CreatedAt = now,
@@ -308,12 +304,11 @@ public class CollectionMutation
         if (input.Color is not null)
             collection.Color = input.Color;
 
-        if (input.DefaultLocale is not null &&
-            Enum.TryParse<Locale>(input.DefaultLocale, true, out var parsedLocale))
-            collection.DefaultLocale = parsedLocale;
+        if (input.DefaultLocale.HasValue)
+            collection.DefaultLocale = input.DefaultLocale.Value;
 
         if (input.SupportedLocales is not null)
-            collection.SupportedLocales = input.SupportedLocales;
+            collection.SupportedLocales = input.SupportedLocales.Select(l => l.ToString()).ToArray();
 
         if (input.IsLocalized.HasValue)
             collection.IsLocalized = input.IsLocalized.Value;

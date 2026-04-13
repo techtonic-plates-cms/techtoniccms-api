@@ -32,7 +32,7 @@ public class Collection
     public string? Color { get; set; }
 
     public required Locale DefaultLocale { get; set; }
-    public required string[] SupportedLocales { get; set; } = ["en"];
+    public required string[] SupportedLocales { get; set; } = [Locale.En.ToString()];
     public required bool IsLocalized { get; set; }
     public required DateTime CreatedAt { get; set; }
     public required DateTime UpdatedAt { get; set; }

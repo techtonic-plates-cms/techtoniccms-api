@@ -68,17 +68,14 @@ public static partial class PolicyRuleType
 
     public static string GetPolicyId([Parent] AbacPolicyRule rule) => rule.PolicyId.ToString();
 
-    [GraphQLType<NonNullType<StringType>>]
-    public static string GetAttributePath([Parent] AbacPolicyRule rule) => rule.AttributePath.ToString();
+    public static AttributePath GetAttributePath([Parent] AbacPolicyRule rule) => rule.AttributePath;
 
-    [GraphQLType<NonNullType<StringType>>]
-    public static string GetOperator([Parent] AbacPolicyRule rule) => rule.Operator.ToString();
+    public static OperatorType GetOperator([Parent] AbacPolicyRule rule) => rule.Operator;
 
     [GraphQLType<NonNullType<StringType>>]
     public static string GetExpectedValue([Parent] AbacPolicyRule rule) => rule.ExpectedValue;
 
-    [GraphQLType<NonNullType<StringType>>]
-    public static string GetValueType([Parent] AbacPolicyRule rule) => rule.ValueType.ToString();
+    public static Schema.TechtonicCms.Enums.ValueType GetValueType([Parent] AbacPolicyRule rule) => rule.ValueType;
 
     public static string? GetDescription([Parent] AbacPolicyRule rule) => rule.Description;
 
@@ -100,21 +97,17 @@ public static partial class PolicyType
 
     public static string? GetDescription([Parent] AbacPolicy policy) => policy.Description;
 
-    [GraphQLType<NonNullType<StringType>>]
-    public static string GetEffect([Parent] AbacPolicy policy) => policy.Effect.ToString();
+    public static PermissionEffect GetEffect([Parent] AbacPolicy policy) => policy.Effect;
 
     public static int GetPriority([Parent] AbacPolicy policy) => policy.Priority;
 
     public static bool GetIsActive([Parent] AbacPolicy policy) => policy.IsActive;
 
-    [GraphQLType<NonNullType<StringType>>]
-    public static string GetResourceType([Parent] AbacPolicy policy) => policy.ResourceType.ToString();
+    public static BaseResource GetResourceType([Parent] AbacPolicy policy) => policy.ResourceType;
 
-    [GraphQLType<NonNullType<StringType>>]
-    public static string GetActionType([Parent] AbacPolicy policy) => policy.ActionType.ToString();
+    public static PermissionAction GetActionType([Parent] AbacPolicy policy) => policy.ActionType;
 
-    [GraphQLType<NonNullType<StringType>>]
-    public static string GetRuleConnector([Parent] AbacPolicy policy) => policy.RuleConnector.ToString();
+    public static LogicalOperator GetRuleConnector([Parent] AbacPolicy policy) => policy.RuleConnector;
 
     public static string? GetCreatedBy([Parent] AbacPolicy policy) => policy.CreatedBy.ToString();
 

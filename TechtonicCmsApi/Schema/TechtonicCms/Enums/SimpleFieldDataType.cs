@@ -1,3 +1,5 @@
+using HotChocolate.Types;
+
 namespace TechtonicCmsApi.Schema.TechtonicCms.Enums;
 
 /// <summary>
@@ -5,6 +7,7 @@ namespace TechtonicCmsApi.Schema.TechtonicCms.Enums;
 /// Used in <c>SimpleFieldConfigInput</c> so the GraphQL schema cannot express
 /// a Relation field through the simple config path.
 /// </summary>
+[EnumType]
 public enum SimpleFieldDataType
 {
     Text,

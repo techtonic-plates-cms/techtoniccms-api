@@ -44,14 +44,6 @@ public class FieldDefinitionInput
 
     public bool? IsUnique { get; set; }
 
-    public bool? IsPublic { get; set; }
-
-    public bool? IsPii { get; set; }
-
-    public bool? IsEncrypted { get; set; }
-
-    public string? SensitivityLevel { get; set; }
-
     public string? ValidationRules { get; set; }
 
     public string? DefaultValue { get; set; }
@@ -79,13 +71,6 @@ public class FieldUpdateDefinitionInput
 
     public bool? IsUnique { get; set; }
 
-    public bool? IsPublic { get; set; }
-
-    public bool? IsPii { get; set; }
-
-    public bool? IsEncrypted { get; set; }
-
-    public string? SensitivityLevel { get; set; }
 
     public string? ValidationRules { get; set; }
 
@@ -237,10 +222,6 @@ public class CollectionMutation
                     DataType = dataType,
                     IsRequired = fieldInput.IsRequired ?? false,
                     IsUnique = fieldInput.IsUnique ?? false,
-                    IsPublic = fieldInput.IsPublic ?? true,
-                    IsPii = fieldInput.IsPii ?? false,
-                    IsEncrypted = fieldInput.IsEncrypted ?? false,
-                    SensitivityLevel = fieldInput.SensitivityLevel ?? "PUBLIC",
                     ValidationRules = fieldInput.ValidationRules,
                     DefaultValue = fieldInput.DefaultValue,
                     HelpText = fieldInput.HelpText,
@@ -387,10 +368,6 @@ public class CollectionMutation
 
                     if (fieldInput.IsRequired.HasValue) existing.IsRequired = fieldInput.IsRequired.Value;
                     if (fieldInput.IsUnique.HasValue) existing.IsUnique = fieldInput.IsUnique.Value;
-                    if (fieldInput.IsPublic.HasValue) existing.IsPublic = fieldInput.IsPublic.Value;
-                    if (fieldInput.IsPii.HasValue) existing.IsPii = fieldInput.IsPii.Value;
-                    if (fieldInput.IsEncrypted.HasValue) existing.IsEncrypted = fieldInput.IsEncrypted.Value;
-                    if (fieldInput.SensitivityLevel is not null) existing.SensitivityLevel = fieldInput.SensitivityLevel;
                     if (fieldInput.ValidationRules is not null) existing.ValidationRules = fieldInput.ValidationRules;
                     if (fieldInput.DefaultValue is not null) existing.DefaultValue = fieldInput.DefaultValue;
                     if (fieldInput.HelpText is not null) existing.HelpText = fieldInput.HelpText;
@@ -447,10 +424,6 @@ public class CollectionMutation
                         DataType = fieldInput.DataType.Value,
                         IsRequired = fieldInput.IsRequired ?? false,
                         IsUnique = fieldInput.IsUnique ?? false,
-                        IsPublic = fieldInput.IsPublic ?? true,
-                        IsPii = fieldInput.IsPii ?? false,
-                        IsEncrypted = fieldInput.IsEncrypted ?? false,
-                        SensitivityLevel = fieldInput.SensitivityLevel ?? "PUBLIC",
                         ValidationRules = fieldInput.ValidationRules,
                         DefaultValue = fieldInput.DefaultValue,
                         HelpText = fieldInput.HelpText,

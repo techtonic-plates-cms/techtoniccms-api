@@ -28,15 +28,6 @@ public static partial class FieldType
 
     public static bool GetIsUnique([Parent] Field field) => field.IsUnique;
 
-    public static bool GetIsPublic([Parent] Field field) => field.IsPublic;
-
-    public static bool GetIsPii([Parent] Field field) => field.IsPii;
-
-    public static bool GetIsEncrypted([Parent] Field field) => field.IsEncrypted;
-
-    [GraphQLType<NonNullType<StringType>>]
-    public static string GetSensitivityLevel([Parent] Field field) => field.SensitivityLevel;
-
     public static string? GetValidationRules([Parent] Field field) => field.ValidationRules;
 
     public static string? GetDefaultValue([Parent] Field field) => field.DefaultValue;

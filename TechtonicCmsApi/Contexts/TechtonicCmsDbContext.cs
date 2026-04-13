@@ -204,10 +204,6 @@ public class TechtonicCmsDbContext : DbContext
             e.Property(f => f.Id).HasDefaultValueSql("gen_random_uuid()");
             e.Property(f => f.IsRequired).HasDefaultValue(false);
             e.Property(f => f.IsUnique).HasDefaultValue(false);
-            e.Property(f => f.IsPublic).HasDefaultValue(true);
-            e.Property(f => f.IsPii).HasDefaultValue(false);
-            e.Property(f => f.IsEncrypted).HasDefaultValue(false);
-            e.Property(f => f.SensitivityLevel).HasDefaultValue("PUBLIC");
             e.Property(f => f.CreatedAt).HasDefaultValueSql("now()");
             e.Property(f => f.UpdatedAt).HasDefaultValueSql("now()");
 

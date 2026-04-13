@@ -1,12 +1,10 @@
 using System.Collections.Generic;
 using System.Linq;
-using System.Linq.Expressions;
 using System.Security.Claims;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using HotChocolate;
-using HotChocolate.Authorization;
 using HotChocolate.Data;
 using HotChocolate.Data.Filters;
 using HotChocolate.Data.Sorting;
@@ -187,7 +185,7 @@ public class CollectionTypeModule : TypeModule
                 "data",
                 $"Dynamic data for the '{collection.Name}' collection",
                 TypeReference.Parse($"{dataTypeName}!"),
-                resolver: async ctx =>
+                resolver: ctx =>
                 {
                     var entry = ctx.Parent<Entry>();
                     var dict = JsonSerializer.Deserialize<Dictionary<string, object>>(entry.Data.RootElement.GetRawText(), new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
@@ -196,27 +194,7 @@ public class CollectionTypeModule : TypeModule
                     // Inject entry ID so relation field resolvers can query entry_relations
                     dict["__entryId"] = entry.Id;
 
-                    // Field-level ABAC: strip fields the current user cannot read
-                    var httpContextAccessor = ctx.Service<IHttpContextAccessor>();
-                    var userId = GetUserId(httpContextAccessor);
-                    var abacService = ctx.Service<AbacService>();
-
-                    var accessibleFieldNames = (await abacService.FilterAccessibleFieldsAsync(
-                        userId,
-                        collection.Fields.OrderBy(f => f.CreatedAt).ToList(),
-                        PermissionAction.Read))
-                        .Select(f => f.Name)
-                        .ToHashSet();
-
-                    // Also keep the internal __entryId key
-                    var filtered = new Dictionary<string, object>();
-                    foreach (var kvp in dict)
-                    {
-                        if (kvp.Key == "__entryId" || accessibleFieldNames.Contains(kvp.Key))
-                            filtered[kvp.Key] = kvp.Value;
-                    }
-
-                    return filtered;
+                    return new ValueTask<object?>(dict);
                 }
             ));
 
@@ -231,8 +209,16 @@ public class CollectionTypeModule : TypeModule
                 TypeReference.Parse(typeName), // Define it as a single type, this is necessary for paging to correctly wrap itself around our resolver
 
                 // Return IQueryable<Entry> so HC filter/sort/paging middleware can compose
-                resolver: ctx =>
+                resolver: async ctx =>
                 {
+                    var httpContextAccessor = ctx.Service<IHttpContextAccessor>();
+                    var readUserId = GetUserId(httpContextAccessor);
+                    var readAbacService = ctx.Service<AbacService>();
+                    await readAbacService.RequirePermissionAsync(readUserId, BaseResource.Entries, PermissionAction.Read, new Dictionary<string, object?>
+                    {
+                        ["ResourceEntryCollectionId"] = collectionId.ToString()
+                    });
+
                     var innerDb = ctx.Service<TechtonicCmsDbContext>();
                     IQueryable<Entry> entries = innerDb.Entries
                         .Where(e => e.CollectionId == collectionId);
@@ -394,7 +380,10 @@ public class CollectionTypeModule : TypeModule
                 var httpContextAccessor = ctx.Service<IHttpContextAccessor>();
 
                 var userId = GetUserId(httpContextAccessor);
-                await abacService.RequirePermissionAsync(userId, BaseResource.Entries, PermissionAction.Create);
+                await abacService.RequirePermissionAsync(userId, BaseResource.Entries, PermissionAction.Create, new Dictionary<string, object?>
+                {
+                    ["ResourceEntryCollectionId"] = collectionId.ToString()
+                });
 
                 var name = ctx.ArgumentValue<string>("name");
                 var slug = ctx.ArgumentValue<string>("slug");
@@ -407,12 +396,6 @@ public class CollectionTypeModule : TypeModule
                 var collectionFields = await mutationDb.Fields
                     .Where(f => f.CollectionId == collectionId)
                     .ToListAsync();
-
-                // Field-level ABAC: determine which fields the user can write to
-                var writableFields = await abacService.FilterAccessibleFieldsAsync(
-                    userId, collectionFields, PermissionAction.Update);
-                var writableFieldNames = writableFields.Select(f => f.Name).ToHashSet();
-                var writableFieldIds = writableFields.Select(f => f.Id).ToHashSet();
 
                 // Separate scalar vs relation field values from the nested data input
                 var scalarData = new Dictionary<string, object?>();
@@ -433,29 +416,11 @@ public class CollectionTypeModule : TypeModule
                         continue;
                     }
 
-                    // Skip fields the user doesn't have permission to write
-                    if (argVal is not null && !writableFieldNames.Contains(f.Name))
-                    {
-                        throw new GraphQLException(ErrorBuilder.New()
-                            .SetMessage($"Permission denied: cannot write to field '{f.Name}'")
-                            .SetCode("FORBIDDEN")
-                            .Build());
-                    }
-
                     if (f.DataType == FieldDataType.Relation)
                     {
                         // Relation values go to the join table, not JSONB
                         if (argVal is not null)
-                        {
-                            if (!writableFieldIds.Contains(f.Id))
-                            {
-                                throw new GraphQLException(ErrorBuilder.New()
-                                    .SetMessage($"Permission denied: cannot write to field '{f.Name}'")
-                                    .SetCode("FORBIDDEN")
-                                    .Build());
-                            }
                             relationValues[f.Id] = argVal.ToString()!;
-                        }
                     }
                     else
                     {
@@ -552,7 +517,10 @@ public class CollectionTypeModule : TypeModule
                 var httpContextAccessor = ctx.Service<IHttpContextAccessor>();
 
                 var userId = GetUserId(httpContextAccessor);
-                await abacService.RequirePermissionAsync(userId, BaseResource.Entries, PermissionAction.Update);
+                await abacService.RequirePermissionAsync(userId, BaseResource.Entries, PermissionAction.Update, new Dictionary<string, object?>
+                {
+                    ["ResourceEntryCollectionId"] = collectionId.ToString()
+                });
 
                 var idStr = ctx.ArgumentValue<string>("id");
                 if (!Guid.TryParse(idStr, out var entryId))
@@ -605,12 +573,6 @@ public class CollectionTypeModule : TypeModule
 
                 if (data.Count > 0)
                 {
-                    // Field-level ABAC: determine which fields the user can write to
-                    var writableFields = await abacService.FilterAccessibleFieldsAsync(
-                        userId, collectionFields, PermissionAction.Update);
-                    var writableFieldNames = writableFields.Select(f => f.Name).ToHashSet();
-                    var writableFieldIds = writableFields.Select(f => f.Id).ToHashSet();
-
                     var existingData = JsonSerializer.Deserialize<Dictionary<string, object?>>(
                         entry.Data.RootElement.GetRawText(),
                         new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
@@ -624,28 +586,13 @@ public class CollectionTypeModule : TypeModule
                         if (!data.TryGetValue(f.Name, out var argVal))
                             continue;
 
-                        // Check field-level write permission
                         if (f.DataType == FieldDataType.Relation)
                         {
-                            if (!writableFieldIds.Contains(f.Id))
-                            {
-                                throw new GraphQLException(ErrorBuilder.New()
-                                    .SetMessage($"Permission denied: cannot write to field '{f.Name}'")
-                                    .SetCode("FORBIDDEN")
-                                    .Build());
-                            }
                             // Track relation changes for the join table
                             relationChanges[f.Id] = argVal?.ToString();
                         }
                         else
                         {
-                            if (!writableFieldNames.Contains(f.Name))
-                            {
-                                throw new GraphQLException(ErrorBuilder.New()
-                                    .SetMessage($"Permission denied: cannot write to field '{f.Name}'")
-                                    .SetCode("FORBIDDEN")
-                                    .Build());
-                            }
                             if (argVal is not null)
                             {
                                 existingData[f.Name] = argVal;
@@ -734,7 +681,10 @@ public class CollectionTypeModule : TypeModule
                 var httpContextAccessor = ctx.Service<IHttpContextAccessor>();
 
                 var userId = GetUserId(httpContextAccessor);
-                await abacService.RequirePermissionAsync(userId, BaseResource.Entries, PermissionAction.Delete);
+                await abacService.RequirePermissionAsync(userId, BaseResource.Entries, PermissionAction.Delete, new Dictionary<string, object?>
+                {
+                    ["ResourceEntryCollectionId"] = collectionId.ToString()
+                });
 
                 var idStr = ctx.ArgumentValue<string>("id");
                 if (!Guid.TryParse(idStr, out var entryId))
@@ -777,7 +727,10 @@ public class CollectionTypeModule : TypeModule
                 var httpContextAccessor = ctx.Service<IHttpContextAccessor>();
 
                 var userId = GetUserId(httpContextAccessor);
-                await abacService.RequirePermissionAsync(userId, BaseResource.Entries, PermissionAction.Publish);
+                await abacService.RequirePermissionAsync(userId, BaseResource.Entries, PermissionAction.Publish, new Dictionary<string, object?>
+                {
+                    ["ResourceEntryCollectionId"] = collectionId.ToString()
+                });
 
                 var idStr = ctx.ArgumentValue<string>("id");
                 if (!Guid.TryParse(idStr, out var entryId))

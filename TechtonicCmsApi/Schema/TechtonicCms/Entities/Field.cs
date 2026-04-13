@@ -7,8 +7,6 @@ namespace TechtonicCmsApi.Schema.TechtonicCms.Entities;
 
 [Table("fields")]
 [Index(nameof(CollectionId), nameof(Name), IsUnique = true)]
-[Index(nameof(SensitivityLevel))]
-[Index(nameof(IsPii))]
 public class Field
 {
     [Key]
@@ -28,12 +26,6 @@ public class Field
 
     public required bool IsRequired { get; set; }
     public required bool IsUnique { get; set; }
-    public required bool IsPublic { get; set; }
-    public required bool IsPii { get; set; }
-    public required bool IsEncrypted { get; set; }
-
-    [StringLength(20)]
-    public required string SensitivityLevel { get; set; } = null!;
 
     [Column(TypeName = "text")]
     public string? ValidationRules { get; set; }

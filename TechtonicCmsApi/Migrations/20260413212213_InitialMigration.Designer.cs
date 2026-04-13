@@ -13,7 +13,7 @@ using TechtonicCmsApi.Contexts;
 namespace TechtonicCmsApi.Migrations
 {
     [DbContext(typeof(TechtonicCmsDbContext))]
-    [Migration("20260409185259_InitialMigration")]
+    [Migration("20260413212213_InitialMigration")]
     partial class InitialMigration
     {
         /// <inheritdoc />
@@ -24,7 +24,7 @@ namespace TechtonicCmsApi.Migrations
                 .HasAnnotation("ProductVersion", "10.0.5")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
-            NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "attribute_path", new[] { "subject_id", "subject_role", "subject_status", "subject_created_at", "resource_collection_id", "resource_collection_slug", "resource_collection_created_by", "resource_collection_is_localized", "resource_entry_id", "resource_entry_status", "resource_entry_created_by", "resource_entry_collection_id", "resource_entry_locale", "resource_entry_published_at", "resource_field_id", "resource_field_name", "resource_field_data_type", "resource_field_sensitivity_level", "resource_field_is_pii", "resource_field_is_public", "resource_field_collection_id", "resource_asset_id", "resource_asset_uploaded_by", "resource_asset_mime_type", "resource_asset_file_size", "environment_current_time", "environment_ip_address", "environment_user_agent", "action_type" });
+            NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "attribute_path", new[] { "subject_id", "subject_role", "subject_status", "subject_created_at", "resource_collection_id", "resource_collection_slug", "resource_collection_created_by", "resource_collection_is_localized", "resource_entry_id", "resource_entry_status", "resource_entry_created_by", "resource_entry_collection_id", "resource_entry_locale", "resource_entry_published_at", "resource_asset_id", "resource_asset_uploaded_by", "resource_asset_mime_type", "resource_asset_file_size", "environment_current_time", "environment_ip_address", "environment_user_agent", "action_type" });
             NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "base_resource", new[] { "users", "collections", "entries", "assets", "fields" });
             NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "entry_status", new[] { "draft", "published", "archived", "deleted" });
             NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "field_data_type", new[] { "text", "boolean", "number", "date_time", "relation", "asset", "object" });
@@ -551,21 +551,6 @@ namespace TechtonicCmsApi.Migrations
                         .HasMaxLength(1024)
                         .HasColumnType("character varying(1024)");
 
-                    b.Property<bool>("IsEncrypted")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
-
-                    b.Property<bool>("IsPii")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
-
-                    b.Property<bool>("IsPublic")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true);
-
                     b.Property<bool>("IsRequired")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -588,13 +573,6 @@ namespace TechtonicCmsApi.Migrations
                     b.Property<Guid?>("RelatedCollectionId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("SensitivityLevel")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasDefaultValue("PUBLIC");
-
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -607,11 +585,7 @@ namespace TechtonicCmsApi.Migrations
 
                     b.HasIndex("CreatedBy");
 
-                    b.HasIndex("IsPii");
-
                     b.HasIndex("RelatedCollectionId");
-
-                    b.HasIndex("SensitivityLevel");
 
                     b.HasIndex("CollectionId", "Name")
                         .IsUnique();

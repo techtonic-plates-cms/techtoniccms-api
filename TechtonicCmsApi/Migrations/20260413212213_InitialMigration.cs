@@ -13,7 +13,7 @@ namespace TechtonicCmsApi.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.AlterDatabase()
-                .Annotation("Npgsql:Enum:attribute_path", "subject_id,subject_role,subject_status,subject_created_at,resource_collection_id,resource_collection_slug,resource_collection_created_by,resource_collection_is_localized,resource_entry_id,resource_entry_status,resource_entry_created_by,resource_entry_collection_id,resource_entry_locale,resource_entry_published_at,resource_field_id,resource_field_name,resource_field_data_type,resource_field_sensitivity_level,resource_field_is_pii,resource_field_is_public,resource_field_collection_id,resource_asset_id,resource_asset_uploaded_by,resource_asset_mime_type,resource_asset_file_size,environment_current_time,environment_ip_address,environment_user_agent,action_type")
+                .Annotation("Npgsql:Enum:attribute_path", "subject_id,subject_role,subject_status,subject_created_at,resource_collection_id,resource_collection_slug,resource_collection_created_by,resource_collection_is_localized,resource_entry_id,resource_entry_status,resource_entry_created_by,resource_entry_collection_id,resource_entry_locale,resource_entry_published_at,resource_asset_id,resource_asset_uploaded_by,resource_asset_mime_type,resource_asset_file_size,environment_current_time,environment_ip_address,environment_user_agent,action_type")
                 .Annotation("Npgsql:Enum:base_resource", "users,collections,entries,assets,fields")
                 .Annotation("Npgsql:Enum:entry_status", "draft,published,archived,deleted")
                 .Annotation("Npgsql:Enum:field_data_type", "text,boolean,number,date_time,relation,asset,object")
@@ -344,10 +344,6 @@ namespace TechtonicCmsApi.Migrations
                     Description = table.Column<string>(type: "text", nullable: true),
                     IsRequired = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false),
                     IsUnique = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false),
-                    IsPublic = table.Column<bool>(type: "boolean", nullable: false, defaultValue: true),
-                    IsPii = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false),
-                    IsEncrypted = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false),
-                    SensitivityLevel = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false, defaultValue: "PUBLIC"),
                     ValidationRules = table.Column<string>(type: "text", nullable: true),
                     DefaultValue = table.Column<string>(type: "text", nullable: true),
                     HelpText = table.Column<string>(type: "character varying(1024)", maxLength: 1024, nullable: true),
@@ -644,19 +640,9 @@ namespace TechtonicCmsApi.Migrations
                 column: "CreatedBy");
 
             migrationBuilder.CreateIndex(
-                name: "IX_fields_IsPii",
-                table: "fields",
-                column: "IsPii");
-
-            migrationBuilder.CreateIndex(
                 name: "IX_fields_RelatedCollectionId",
                 table: "fields",
                 column: "RelatedCollectionId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_fields_SensitivityLevel",
-                table: "fields",
-                column: "SensitivityLevel");
 
             migrationBuilder.CreateIndex(
                 name: "IX_resource_ownerships_AssignedBy",
@@ -736,8 +722,8 @@ namespace TechtonicCmsApi.Migrations
                 table: "user_roles",
                 columns: new[] { "UserId", "RoleId" },
                 unique: true);
-
-            // CMS JSONB extraction functions for querying dynamic field values.
+                
+         // CMS JSONB extraction functions for querying dynamic field values.
             // Each function extracts a typed value from a JSONB document by key.
             // IMMUTABLE = same inputs always produce same output (required for expression indexes).
             // STRICT = returns NULL automatically if any input is NULL (handles missing keys).

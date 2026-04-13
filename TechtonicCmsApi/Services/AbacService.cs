@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -19,6 +21,11 @@ public class AbacService
 {
     private readonly TechtonicCmsDbContext _db;
 
+    /// <summary>Cache TTL for positive (Allow) evaluations.</summary>
+    private static readonly TimeSpan CacheTtlAllow = TimeSpan.FromMinutes(5);
+    /// <summary>Cache TTL for negative (Deny) evaluations — shorter to allow quick recovery.</summary>
+    private static readonly TimeSpan CacheTtlDeny = TimeSpan.FromMinutes(2);
+
     public AbacService(TechtonicCmsDbContext db)
     {
         _db = db;
@@ -28,8 +35,18 @@ public class AbacService
         Guid userId,
         BaseResource resourceType,
         PermissionAction action,
-        Dictionary<string, object?>? resourceData = null)
+        Dictionary<string, object?>? resourceData = null,
+        Guid? fieldId = null)
     {
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+        // ── Try cache lookup first ────────────────────────────────
+        var resourceId = ResolveResourceId(resourceType, resourceData);
+        var cached = await LookupCacheAsync(userId, resourceType, resourceId, action, fieldId);
+        if (cached != null)
+            return cached.Value;
+
+        // ── Full evaluation ───────────────────────────────────────
         var now = DateTime.UtcNow;
 
         var roleIds = await _db.UserRoles
@@ -50,7 +67,13 @@ public class AbacService
         var allPolicyIds = policyIdsFromRoles.Concat(policyIdsDirect).ToHashSet();
 
         if (allPolicyIds.Count == 0)
+        {
+            stopwatch.Stop();
+            await WriteAuditAsync(userId, resourceType, resourceId, action, fieldId,
+                PermissionEffect.Deny, [], [], "No policies assigned to user",
+                stopwatch.ElapsedMilliseconds, resourceData);
             return false;
+        }
 
         var policies = await _db.AbacPolicies
             .Where(p => allPolicyIds.Contains(p.Id)
@@ -70,20 +93,235 @@ public class AbacService
             .ToList();
 
         var context = BuildContext(userId, resourceData);
+        var evaluatedPolicyIds = policies.Select(p => p.Id).ToArray();
+        var matchingPolicyIds = new List<Guid>();
 
         foreach (var policy in denyPolicies)
         {
             if (await EvaluatePolicyRulesAsync(policy, context))
+            {
+                matchingPolicyIds.Add(policy.Id);
+                stopwatch.Stop();
+
+                var decision = PermissionEffect.Deny;
+                await WriteAuditAsync(userId, resourceType, resourceId, action, fieldId,
+                    decision, evaluatedPolicyIds, matchingPolicyIds.ToArray(),
+                    $"Denied by policy '{policy.Name}' (priority {policy.Priority})",
+                    stopwatch.ElapsedMilliseconds, resourceData);
+                await WriteCacheAsync(userId, resourceType, resourceId, action, fieldId,
+                    decision, matchingPolicyIds.ToArray(), stopwatch.ElapsedMilliseconds,
+                    policies);
+
                 return false;
+            }
         }
 
         foreach (var policy in allowPolicies)
         {
             if (await EvaluatePolicyRulesAsync(policy, context))
+            {
+                matchingPolicyIds.Add(policy.Id);
+                stopwatch.Stop();
+
+                var decision = PermissionEffect.Allow;
+                await WriteAuditAsync(userId, resourceType, resourceId, action, fieldId,
+                    decision, evaluatedPolicyIds, matchingPolicyIds.ToArray(),
+                    $"Allowed by policy '{policy.Name}' (priority {policy.Priority})",
+                    stopwatch.ElapsedMilliseconds, resourceData);
+                await WriteCacheAsync(userId, resourceType, resourceId, action, fieldId,
+                    decision, matchingPolicyIds.ToArray(), stopwatch.ElapsedMilliseconds,
+                    policies);
+
                 return true;
+            }
         }
 
+        stopwatch.Stop();
+        await WriteAuditAsync(userId, resourceType, resourceId, action, fieldId,
+            PermissionEffect.Deny, evaluatedPolicyIds, [],
+            "No matching allow policy found", stopwatch.ElapsedMilliseconds, resourceData);
+
         return false;
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // Audit & Cache Helpers
+    // ──────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Resolves a deterministic resource ID from resource type and data.
+    /// For field-level checks, uses the field's collection+field composite.
+    /// </summary>
+    private static Guid ResolveResourceId(
+        BaseResource resourceType,
+        Dictionary<string, object?>? resourceData)
+    {
+        // If explicit ResourceFieldId present, derive a deterministic GUID from it
+        if (resourceData != null
+            && resourceData.TryGetValue("ResourceFieldId", out var fieldIdStr)
+            && fieldIdStr is string fidStr
+            && Guid.TryParse(fidStr, out var fid))
+        {
+            return fid;
+        }
+
+        // Fallback: hash resource type name to get a stable "no specific resource" ID
+        using var md5 = MD5.Create();
+        var hash = md5.ComputeHash(Encoding.UTF8.GetBytes(resourceType.ToString()));
+        return new Guid(hash);
+    }
+
+    /// <summary>
+    /// Looks up a cached evaluation. Returns null if no valid cache entry exists.
+    /// </summary>
+    private async Task<bool?> LookupCacheAsync(
+        Guid userId,
+        BaseResource resourceType,
+        Guid resourceId,
+        PermissionAction action,
+        Guid? fieldId)
+    {
+        IQueryable<AbacEvaluationCache> query = _db.AbacEvaluationCaches
+            .Where(c => c.UserId == userId
+                && c.ResourceType == resourceType
+                && c.ResourceId == resourceId
+                && c.ActionType == action
+                && c.ExpiresAt > DateTime.UtcNow);
+
+        if (fieldId.HasValue)
+            query = query.Where(c => c.FieldId == fieldId);
+        else
+            query = query.Where(c => c.FieldId == null);
+
+        var cached = await query.FirstOrDefaultAsync();
+        return cached?.Decision == PermissionEffect.Allow ? true
+             : cached?.Decision == PermissionEffect.Deny ? false
+             : null;
+    }
+
+    /// <summary>
+    /// Writes an audit record for an ABAC evaluation.
+    /// Fire-and-forget style — does not propagate errors to the caller.
+    /// </summary>
+    private async Task WriteAuditAsync(
+        Guid userId,
+        BaseResource resourceType,
+        Guid resourceId,
+        PermissionAction action,
+        Guid? fieldId,
+        PermissionEffect decision,
+        Guid[] evaluatedPolicyIds,
+        Guid[] matchingPolicyIds,
+        string decisionReason,
+        long evaluationTimeMs,
+        Dictionary<string, object?>? resourceData)
+    {
+        try
+        {
+            var audit = new AbacAudit
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                ResourceType = resourceType,
+                ResourceId = resourceId,
+                RequestedAction = action,
+                FieldId = fieldId,
+                Decision = decision,
+                EvaluatedPolicyIds = evaluatedPolicyIds,
+                MatchingPolicyIds = matchingPolicyIds,
+                DecisionReason = decisionReason,
+                EvaluationTimeMs = (int)evaluationTimeMs,
+                RequestContext = JsonSerializer.Serialize(resourceData ?? new()),
+                Timestamp = DateTime.UtcNow
+            };
+
+            _db.AbacAudits.Add(audit);
+            await _db.SaveChangesAsync();
+        }
+        catch
+        {
+            // Audit failures must never block permission checks
+        }
+    }
+
+    /// <summary>
+    /// Writes or updates a cache entry for an ABAC evaluation.
+    /// </summary>
+    private async Task WriteCacheAsync(
+        Guid userId,
+        BaseResource resourceType,
+        Guid resourceId,
+        PermissionAction action,
+        Guid? fieldId,
+        PermissionEffect decision,
+        Guid[] matchingPolicyIds,
+        long evaluationTimeMs,
+        List<AbacPolicy> evaluatedPolicies)
+    {
+        try
+        {
+            // Invalidate any existing cache entry for this exact key
+            IQueryable<AbacEvaluationCache> existingQuery = _db.AbacEvaluationCaches
+                .Where(c => c.UserId == userId
+                    && c.ResourceType == resourceType
+                    && c.ResourceId == resourceId
+                    && c.ActionType == action);
+
+            if (fieldId.HasValue)
+                existingQuery = existingQuery.Where(c => c.FieldId == fieldId);
+            else
+                existingQuery = existingQuery.Where(c => c.FieldId == null);
+
+            var existing = await existingQuery.FirstOrDefaultAsync();
+            if (existing != null)
+                _db.AbacEvaluationCaches.Remove(existing);
+
+            var ttl = decision == PermissionEffect.Allow ? CacheTtlAllow : CacheTtlDeny;
+            var now = DateTime.UtcNow;
+
+            var contextChecksum = ComputeContextChecksum(
+                userId, resourceType, resourceId, action, fieldId);
+            var policyVersions = string.Join(",",
+                evaluatedPolicies.Select(p => $"{p.Id}:{p.UpdatedAt:O}"));
+
+            _db.AbacEvaluationCaches.Add(new AbacEvaluationCache
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                ResourceType = resourceType,
+                ResourceId = resourceId,
+                ActionType = action,
+                FieldId = fieldId,
+                Decision = decision,
+                MatchingPolicyIds = matchingPolicyIds,
+                EvaluationTimeMs = (int)evaluationTimeMs,
+                ComputedAt = now,
+                ExpiresAt = now + ttl,
+                ContextChecksum = contextChecksum,
+                PolicyVersions = policyVersions
+            });
+
+            await _db.SaveChangesAsync();
+        }
+        catch
+        {
+            // Cache failures must never block permission checks
+        }
+    }
+
+    /// <summary>
+    /// Computes a SHA256 checksum of the evaluation context for cache invalidation.
+    /// </summary>
+    private static string ComputeContextChecksum(
+        Guid userId,
+        BaseResource resourceType,
+        Guid resourceId,
+        PermissionAction action,
+        Guid? fieldId)
+    {
+        var raw = $"{userId}:{resourceType}:{resourceId}:{action}:{fieldId}";
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(raw));
+        return Convert.ToHexString(hash);
     }
 
     public async Task RequirePermissionAsync(
@@ -101,6 +339,85 @@ public class AbacService
                     .SetCode("FORBIDDEN")
                     .Build());
         }
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // Field-Level ABAC API
+    // ──────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Builds the resource data context for a field-level ABAC evaluation,
+    /// populating all <see cref="AttributePath.ResourceField*"/> attributes.
+    /// </summary>
+    private static Dictionary<string, object?> BuildFieldResourceData(Field field)
+    {
+        return new Dictionary<string, object?>
+        {
+            ["ResourceFieldId"] = field.Id.ToString(),
+            ["ResourceFieldName"] = field.Name,
+            ["ResourceFieldDataType"] = field.DataType.ToString(),
+            ["ResourceFieldSensitivityLevel"] = field.SensitivityLevel,
+            ["ResourceFieldIsPii"] = field.IsPii.ToString().ToLowerInvariant(),
+            ["ResourceFieldIsPublic"] = field.IsPublic.ToString().ToLowerInvariant(),
+            ["ResourceFieldCollectionId"] = field.CollectionId.ToString()
+        };
+    }
+
+    /// <summary>
+    /// Checks whether a user has the specified permission on a specific field.
+    /// Uses <see cref="BaseResource.Fields"/> as the resource type and evaluates
+    /// against the field's metadata attributes (PII, sensitivity level, etc.).
+    /// </summary>
+    public async Task<bool> CheckFieldPermissionAsync(
+        Guid userId,
+        Field field,
+        PermissionAction action)
+    {
+        var resourceData = BuildFieldResourceData(field);
+        return await CheckPermissionAsync(userId, BaseResource.Fields, action, resourceData, field.Id);
+    }
+
+    /// <summary>
+    /// Requires that a user has the specified permission on a specific field.
+    /// Throws <see cref="GraphQLException"/> with FORBIDDEN if denied.
+    /// </summary>
+    public async Task RequireFieldPermissionAsync(
+        Guid userId,
+        Field field,
+        PermissionAction action)
+    {
+        var allowed = await CheckFieldPermissionAsync(userId, field, action);
+        if (!allowed)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage($"Permission denied: {action} on field '{field.Name}'")
+                    .SetCode("FORBIDDEN")
+                    .Build());
+        }
+    }
+
+    /// <summary>
+    /// Returns the subset of fields the user is allowed to access for the given action.
+    /// Fields are evaluated against <see cref="BaseResource.Fields"/> policies using
+    /// the deny-first model. Fields with no matching Allow policy are excluded.
+    /// </summary>
+    public async Task<List<Field>> FilterAccessibleFieldsAsync(
+        Guid userId,
+        List<Field> fields,
+        PermissionAction action)
+    {
+        var accessibleFields = new List<Field>();
+
+        foreach (var field in fields)
+        {
+            var resourceData = BuildFieldResourceData(field);
+            var allowed = await CheckPermissionAsync(userId, BaseResource.Fields, action, resourceData);
+            if (allowed)
+                accessibleFields.Add(field);
+        }
+
+        return accessibleFields;
     }
 
     private async Task<bool> EvaluatePolicyRulesAsync(

@@ -60,13 +60,13 @@ public class CollectionTypeModule : TypeModule
             IsExtension = true
         };
 
-        var dynamicCollectionsTypeDef = new ObjectTypeDefinition("DynamicCollections")
+        var collectionEntriesTypeDef = new ObjectTypeDefinition("Entries")
         {
-            Description = "Root type for all dynamic collections",
+            Description = "Root type for all entries",
             RuntimeType = typeof(Dictionary<string, object>)
         };
 
-        types.Add(ObjectType.CreateUnsafe(dynamicCollectionsTypeDef));
+        types.Add(ObjectType.CreateUnsafe(collectionEntriesTypeDef));
 
         foreach (var collection in collections)
         {
@@ -90,6 +90,8 @@ public class CollectionTypeModule : TypeModule
                 {
                     // Relation field: resolve via entry_relations join table
                     var fieldId = field.Id;
+                    var fieldName = field.Name;
+                    var capturedField = field;
                     dataTypeDef.Fields.Add(new ObjectFieldDefinition(
                         field.Name,
                         field.Description,
@@ -97,6 +99,10 @@ public class CollectionTypeModule : TypeModule
                         resolver: async ctx =>
                         {
                             var data = ctx.Parent<Dictionary<string, object>>();
+
+                            // If the data resolver already stripped this field, return null
+                            if (!data.ContainsKey(fieldName))
+                                return null;
 
                             // The __entryId key is injected by the data resolver below
                             if (!data.TryGetValue("__entryId", out var rawEntryId) || rawEntryId is not Guid entryId)
@@ -181,16 +187,36 @@ public class CollectionTypeModule : TypeModule
                 "data",
                 $"Dynamic data for the '{collection.Name}' collection",
                 TypeReference.Parse($"{dataTypeName}!"),
-                resolver: _ =>
+                resolver: async ctx =>
                 {
-                    var entry = _.Parent<Entry>();
+                    var entry = ctx.Parent<Entry>();
                     var dict = JsonSerializer.Deserialize<Dictionary<string, object>>(entry.Data.RootElement.GetRawText(), new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
                         ?? new Dictionary<string, object>();
 
                     // Inject entry ID so relation field resolvers can query entry_relations
                     dict["__entryId"] = entry.Id;
 
-                    return new ValueTask<object?>(dict);
+                    // Field-level ABAC: strip fields the current user cannot read
+                    var httpContextAccessor = ctx.Service<IHttpContextAccessor>();
+                    var userId = GetUserId(httpContextAccessor);
+                    var abacService = ctx.Service<AbacService>();
+
+                    var accessibleFieldNames = (await abacService.FilterAccessibleFieldsAsync(
+                        userId,
+                        collection.Fields.OrderBy(f => f.CreatedAt).ToList(),
+                        PermissionAction.Read))
+                        .Select(f => f.Name)
+                        .ToHashSet();
+
+                    // Also keep the internal __entryId key
+                    var filtered = new Dictionary<string, object>();
+                    foreach (var kvp in dict)
+                    {
+                        if (kvp.Key == "__entryId" || accessibleFieldNames.Contains(kvp.Key))
+                            filtered[kvp.Key] = kvp.Value;
+                    }
+
+                    return filtered;
                 }
             ));
 
@@ -260,15 +286,15 @@ public class CollectionTypeModule : TypeModule
                     }
                 });
 
-            dynamicCollectionsTypeDef.Fields.Add(fieldDescriptor.ToDefinition());
+            collectionEntriesTypeDef.Fields.Add(fieldDescriptor.ToDefinition());
 
 
         }
 
         queryExtensionDef.Fields.Add(new ObjectFieldDefinition(
-            "dynamicCollections",
-            "List of all dynamic collections",
-            TypeReference.Parse("DynamicCollections!"),
+            "entries",
+            "List of all entries for collections",
+            TypeReference.Parse("Entries!"),
             resolver: _ => new ValueTask<object?>(new Dictionary<string, object>())
         ));
 
@@ -278,13 +304,13 @@ public class CollectionTypeModule : TypeModule
         // Dynamic Mutation Types
         // ──────────────────────────────────────────────────────────────
 
-        var dynamicCollectionsMutationsTypeDef = new ObjectTypeDefinition("DynamicCollectionsMutations")
+        var entriesMutationsTypeDef = new ObjectTypeDefinition("EntriesMutations")
         {
-            Description = "Root type for all dynamic collection mutations",
+            Description = "Root type for all entry mutations",
             RuntimeType = typeof(Dictionary<string, object>)
         };
 
-        types.Add(ObjectType.CreateUnsafe(dynamicCollectionsMutationsTypeDef));
+        types.Add(ObjectType.CreateUnsafe(entriesMutationsTypeDef));
 
         foreach (var collection in collections)
         {
@@ -301,6 +327,43 @@ public class CollectionTypeModule : TypeModule
                 Description = $"Mutations for the '{collection.Name}' collection",
                 RuntimeType = typeof(Dictionary<string, object>)
             };
+
+            // ── Dynamic input types ──
+            var createDataInputTypeName = $"{pascalName}CreateEntryDataInput";
+            var updateDataInputTypeName = $"{pascalName}UpdateEntryDataInput";
+
+            var createDataInputDef = new InputObjectTypeDefinition(createDataInputTypeName)
+            {
+                Description = $"Input type for creating entries in the '{collection.Name}' collection",
+                RuntimeType = typeof(Dictionary<string, object>)
+            };
+
+            var updateDataInputDef = new InputObjectTypeDefinition(updateDataInputTypeName)
+            {
+                Description = $"Input type for updating entries in the '{collection.Name}' collection (all fields optional)",
+                RuntimeType = typeof(Dictionary<string, object>)
+            };
+
+            foreach (var field in fields)
+            {
+                var graphqlType = MapFieldType(field.DataType);
+
+                // Create input: required fields get !
+                var createFieldType = field.IsRequired ? graphqlType + "!" : graphqlType;
+                createDataInputDef.Fields.Add(new InputFieldDefinition(
+                    field.Name,
+                    field.Description ?? $"Field '{field.Name}'",
+                    TypeReference.Parse(createFieldType)));
+
+                // Update input: all fields optional (partial update)
+                updateDataInputDef.Fields.Add(new InputFieldDefinition(
+                    field.Name,
+                    field.Description ?? $"Field '{field.Name}'",
+                    TypeReference.Parse(graphqlType)));
+            }
+
+            types.Add(InputObjectType.CreateUnsafe(createDataInputDef));
+            types.Add(InputObjectType.CreateUnsafe(updateDataInputDef));
 
             // ── create mutation ──
             var createFieldDef = new ObjectFieldDefinition(
@@ -320,17 +383,9 @@ public class CollectionTypeModule : TypeModule
             createFieldDef.Arguments.Add(new ArgumentDefinition(
                 "status", "Entry status (defaults to DRAFT)", TypeReference.Parse("String")));
 
-            foreach (var field in fields)
-            {
-                var argType = MapFieldType(field.DataType);
-                if (field.IsRequired)
-                    argType += "!";
-
-                createFieldDef.Arguments.Add(new ArgumentDefinition(
-                    field.Name,
-                    field.Description ?? $"Field '{field.Name}'",
-                    TypeReference.Parse(argType)));
-            }
+            createFieldDef.Arguments.Add(new ArgumentDefinition(
+                "data", $"Dynamic data for the '{collection.Name}' collection",
+                TypeReference.Parse($"{createDataInputTypeName}!")));
 
             createFieldDef.Resolver = async ctx =>
             {
@@ -345,44 +400,67 @@ public class CollectionTypeModule : TypeModule
                 var slug = ctx.ArgumentValue<string>("slug");
                 var localeStr = ctx.ArgumentValue<string>("locale");
                 var statusStr = ctx.ArgumentValue<string>("status");
+                var data = ctx.ArgumentValue<Dictionary<string, object?>>("data")
+                    ?? new Dictionary<string, object?>();
 
                 // Load collection fields for validation
                 var collectionFields = await mutationDb.Fields
                     .Where(f => f.CollectionId == collectionId)
                     .ToListAsync();
 
-                // Separate scalar vs relation field values
+                // Field-level ABAC: determine which fields the user can write to
+                var writableFields = await abacService.FilterAccessibleFieldsAsync(
+                    userId, collectionFields, PermissionAction.Update);
+                var writableFieldNames = writableFields.Select(f => f.Name).ToHashSet();
+                var writableFieldIds = writableFields.Select(f => f.Id).ToHashSet();
+
+                // Separate scalar vs relation field values from the nested data input
                 var scalarData = new Dictionary<string, object?>();
                 var relationValues = new Dictionary<Guid, string>(); // fieldId → target entry ID string
 
                 foreach (var f in collectionFields)
                 {
-                    var argVal = ctx.ArgumentValue<object?>(f.Name);
+                    if (!data.TryGetValue(f.Name, out var argVal))
+                    {
+                        // Check required fields
+                        if (f.IsRequired)
+                        {
+                            throw new GraphQLException(ErrorBuilder.New()
+                                .SetMessage($"Required field '{f.Name}' is missing")
+                                .SetCode("BAD_REQUEST")
+                                .Build());
+                        }
+                        continue;
+                    }
+
+                    // Skip fields the user doesn't have permission to write
+                    if (argVal is not null && !writableFieldNames.Contains(f.Name))
+                    {
+                        throw new GraphQLException(ErrorBuilder.New()
+                            .SetMessage($"Permission denied: cannot write to field '{f.Name}'")
+                            .SetCode("FORBIDDEN")
+                            .Build());
+                    }
 
                     if (f.DataType == FieldDataType.Relation)
                     {
                         // Relation values go to the join table, not JSONB
                         if (argVal is not null)
                         {
+                            if (!writableFieldIds.Contains(f.Id))
+                            {
+                                throw new GraphQLException(ErrorBuilder.New()
+                                    .SetMessage($"Permission denied: cannot write to field '{f.Name}'")
+                                    .SetCode("FORBIDDEN")
+                                    .Build());
+                            }
                             relationValues[f.Id] = argVal.ToString()!;
-                        }
-                        else if (f.IsRequired)
-                        {
-                            throw new GraphQLException(ErrorBuilder.New()
-                                .SetMessage($"Required relation field '{f.Name}' is missing")
-                                .SetCode("BAD_REQUEST")
-                                .Build());
                         }
                     }
                     else
                     {
                         if (argVal is not null)
                             scalarData[f.Name] = argVal;
-                        else if (f.IsRequired)
-                            throw new GraphQLException(ErrorBuilder.New()
-                                .SetMessage($"Required field '{f.Name}' is missing")
-                                .SetCode("BAD_REQUEST")
-                                .Build());
                     }
                 }
 
@@ -467,15 +545,9 @@ public class CollectionTypeModule : TypeModule
             updateFieldDef.Arguments.Add(new ArgumentDefinition(
                 "status", "New status", TypeReference.Parse("String")));
 
-            foreach (var field in fields)
-            {
-                // Update args are always optional (partial update)
-                var argType = MapFieldType(field.DataType);
-                updateFieldDef.Arguments.Add(new ArgumentDefinition(
-                    field.Name,
-                    field.Description ?? $"Field '{field.Name}'",
-                    TypeReference.Parse(argType)));
-            }
+            updateFieldDef.Arguments.Add(new ArgumentDefinition(
+                "data", $"Dynamic data for the '{collection.Name}' collection (partial update)",
+                TypeReference.Parse(updateDataInputTypeName)));
 
             updateFieldDef.Resolver = async ctx =>
             {
@@ -506,6 +578,8 @@ public class CollectionTypeModule : TypeModule
                 var slug = ctx.ArgumentValue<string>("slug");
                 var localeStr = ctx.ArgumentValue<string>("locale");
                 var statusStr = ctx.ArgumentValue<string>("status");
+                var data = ctx.ArgumentValue<Dictionary<string, object?>?>("data")
+                    ?? new Dictionary<string, object?>();
 
                 if (name is not null) entry.Name = name;
                 if (slug is not null)
@@ -528,86 +602,113 @@ public class CollectionTypeModule : TypeModule
                         entry.PublishedAt = DateTime.UtcNow;
                 }
 
-                // Merge dynamic field data
+                // Merge dynamic field data from the nested data input
                 var collectionFields = await mutationDb.Fields
                     .Where(f => f.CollectionId == collectionId)
                     .ToListAsync();
 
-                var existingData = JsonSerializer.Deserialize<Dictionary<string, object?>>(
-                    entry.Data.RootElement.GetRawText(),
-                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
-                    ?? new Dictionary<string, object?>();
-
-                var scalarChanged = false;
-                var relationChanges = new Dictionary<Guid, string?>(); // fieldId → targetId (null = remove)
-
-                foreach (var f in collectionFields)
+                if (data.Count > 0)
                 {
-                    var argVal = ctx.ArgumentValue<object?>(f.Name);
-                    if (argVal is null) continue;
+                    // Field-level ABAC: determine which fields the user can write to
+                    var writableFields = await abacService.FilterAccessibleFieldsAsync(
+                        userId, collectionFields, PermissionAction.Update);
+                    var writableFieldNames = writableFields.Select(f => f.Name).ToHashSet();
+                    var writableFieldIds = writableFields.Select(f => f.Id).ToHashSet();
 
-                    if (f.DataType == FieldDataType.Relation)
+                    var existingData = JsonSerializer.Deserialize<Dictionary<string, object?>>(
+                        entry.Data.RootElement.GetRawText(),
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+                        ?? new Dictionary<string, object?>();
+
+                    var scalarChanged = false;
+                    var relationChanges = new Dictionary<Guid, string?>(); // fieldId → targetId (null = remove)
+
+                    foreach (var f in collectionFields)
                     {
-                        // Track relation changes for the join table
-                        relationChanges[f.Id] = argVal.ToString();
-                    }
-                    else
-                    {
-                        existingData[f.Name] = argVal;
-                        scalarChanged = true;
-                    }
-                }
+                        if (!data.TryGetValue(f.Name, out var argVal))
+                            continue;
 
-                if (scalarChanged)
-                {
-                    // Validate unique constraints on scalar data only
-                    await ValidateEntryData(existingData, new Dictionary<Guid, string>(), collectionFields, mutationDb, collectionId, excludeEntryId: entryId);
-                    entry.Data.Dispose();
-                    entry.Data = JsonDocument.Parse(
-                        JsonSerializer.Serialize(existingData.Where(kvp => kvp.Value is not null)
-                            .ToDictionary(kvp => kvp.Key, kvp => kvp.Value)));
-                }
-
-                // Apply relation changes to join table
-                if (relationChanges.Count > 0)
-                {
-                    var changedFieldIds = relationChanges.Keys.ToList();
-                    var existingRelations = await mutationDb.EntryRelations
-                        .Where(er => er.EntryId == entryId && changedFieldIds.Contains(er.FieldId))
-                        .ToListAsync();
-
-                    // Validate relation targets
-                    var relationValues = relationChanges
-                        .Where(kvp => kvp.Value is not null)
-                        .ToDictionary(kvp => kvp.Key, kvp => kvp.Value!);
-                    await ValidateEntryData(new Dictionary<string, object?>(), relationValues, collectionFields, mutationDb, collectionId, excludeEntryId: entryId);
-
-                    foreach (var (fieldId, targetIdStr) in relationChanges)
-                    {
-                        var existing = existingRelations.FirstOrDefault(er => er.FieldId == fieldId);
-
-                        if (targetIdStr is null)
+                        // Check field-level write permission
+                        if (f.DataType == FieldDataType.Relation)
                         {
-                            // Remove relation
-                            if (existing is not null)
-                                mutationDb.EntryRelations.Remove(existing);
-                        }
-                        else if (Guid.TryParse(targetIdStr, out var targetId))
-                        {
-                            if (existing is not null)
+                            if (!writableFieldIds.Contains(f.Id))
                             {
-                                // Update existing relation
-                                existing.TargetEntryId = targetId;
+                                throw new GraphQLException(ErrorBuilder.New()
+                                    .SetMessage($"Permission denied: cannot write to field '{f.Name}'")
+                                    .SetCode("FORBIDDEN")
+                                    .Build());
                             }
-                            else
+                            // Track relation changes for the join table
+                            relationChanges[f.Id] = argVal?.ToString();
+                        }
+                        else
+                        {
+                            if (!writableFieldNames.Contains(f.Name))
                             {
-                                // Add new relation
-                                mutationDb.EntryRelations.Add(new EntryRelation
+                                throw new GraphQLException(ErrorBuilder.New()
+                                    .SetMessage($"Permission denied: cannot write to field '{f.Name}'")
+                                    .SetCode("FORBIDDEN")
+                                    .Build());
+                            }
+                            if (argVal is not null)
+                            {
+                                existingData[f.Name] = argVal;
+                                scalarChanged = true;
+                            }
+                        }
+                    }
+
+                    if (scalarChanged)
+                    {
+                        // Validate unique constraints on scalar data only
+                        await ValidateEntryData(existingData, new Dictionary<Guid, string>(), collectionFields, mutationDb, collectionId, excludeEntryId: entryId);
+                        entry.Data.Dispose();
+                        entry.Data = JsonDocument.Parse(
+                            JsonSerializer.Serialize(existingData.Where(kvp => kvp.Value is not null)
+                                .ToDictionary(kvp => kvp.Key, kvp => kvp.Value)));
+                    }
+
+                    // Apply relation changes to join table
+                    if (relationChanges.Count > 0)
+                    {
+                        var changedFieldIds = relationChanges.Keys.ToList();
+                        var existingRelations = await mutationDb.EntryRelations
+                            .Where(er => er.EntryId == entryId && changedFieldIds.Contains(er.FieldId))
+                            .ToListAsync();
+
+                        // Validate relation targets
+                        var relationValues = relationChanges
+                            .Where(kvp => kvp.Value is not null)
+                            .ToDictionary(kvp => kvp.Key, kvp => kvp.Value!);
+                        await ValidateEntryData(new Dictionary<string, object?>(), relationValues, collectionFields, mutationDb, collectionId, excludeEntryId: entryId);
+
+                        foreach (var (fieldId, targetIdStr) in relationChanges)
+                        {
+                            var existing = existingRelations.FirstOrDefault(er => er.FieldId == fieldId);
+
+                            if (targetIdStr is null)
+                            {
+                                // Remove relation
+                                if (existing is not null)
+                                    mutationDb.EntryRelations.Remove(existing);
+                            }
+                            else if (Guid.TryParse(targetIdStr, out var targetId))
+                            {
+                                if (existing is not null)
                                 {
-                                    EntryId = entryId,
-                                    FieldId = fieldId,
-                                    TargetEntryId = targetId
-                                });
+                                    // Update existing relation
+                                    existing.TargetEntryId = targetId;
+                                }
+                                else
+                                {
+                                    // Add new relation
+                                    mutationDb.EntryRelations.Add(new EntryRelation
+                                    {
+                                        EntryId = entryId,
+                                        FieldId = fieldId,
+                                        TargetEntryId = targetId
+                                    });
+                                }
                             }
                         }
                     }
@@ -710,8 +811,8 @@ public class CollectionTypeModule : TypeModule
 
             types.Add(ObjectType.CreateUnsafe(collectionMutationsTypeDef));
 
-            // Add field on DynamicCollectionsMutations pointing to this collection's mutation type
-            dynamicCollectionsMutationsTypeDef.Fields.Add(new ObjectFieldDefinition(
+            // Add field on EntriesMutations pointing to this collection's mutation type
+            entriesMutationsTypeDef.Fields.Add(new ObjectFieldDefinition(
                 camelName,
                 $"Mutations for the '{collection.Name}' collection",
                 TypeReference.Parse($"{collectionMutationsTypeName}!"),
@@ -719,15 +820,16 @@ public class CollectionTypeModule : TypeModule
         }
 
         // Wire dynamicCollections field on Mutation root
-        var mutationExtensionDef = new ObjectTypeDefinition("Mutation")
+        var mutationExtensionDef = new ObjectTypeDefinition("CollectionMutation")
         {
-            IsExtension = true
+            IsExtension = true,
+            RuntimeType = typeof(CollectionMutation)
         };
 
         mutationExtensionDef.Fields.Add(new ObjectFieldDefinition(
-            "dynamicCollections",
-            "Mutations for all dynamic collections",
-            TypeReference.Parse("DynamicCollectionsMutations!"),
+            "entries",
+            "Mutations for all entries",
+            TypeReference.Parse("EntriesMutations!"),
             pureResolver: _ => new Dictionary<string, object>()));
 
         types.Add(ObjectTypeExtension.CreateUnsafe(mutationExtensionDef));

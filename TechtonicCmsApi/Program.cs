@@ -29,6 +29,12 @@ builder.Services.AddOptions<RedisOptions>()
     .Bind(builder.Configuration.GetSection("Redis"));
 builder.Services.AddOptions<S3Options>()
     .Bind(builder.Configuration.GetSection("S3"));
+
+if(builder.Environment.IsDevelopment())
+{
+    builder.Configuration["Jwt:AccessTokenTtlMinutes"] = "1440"; // 1 day
+}
+
 builder.Services.AddOptions<JwtOptions>()
     .Bind(builder.Configuration.GetSection("Jwt"));
 

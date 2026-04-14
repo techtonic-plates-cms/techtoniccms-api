@@ -39,5 +39,7 @@ public class Collection
 
     public User CreatedByUser { get; set; } = null!;
     public ICollection<Field> Fields { get; set; } = new List<Field>();
+
+    [GraphQLIgnore]
     public ICollection<Entry> Entries { get; set; } = new List<Entry>();
 }

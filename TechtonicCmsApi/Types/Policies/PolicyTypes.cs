@@ -106,21 +106,20 @@ public partial class PolicyType : ObjectType<AbacPolicy>
     [ExtendObjectType(typeof(PolicyType))]
     public class PolicyTypeResolvers
     {
-        public async Task<IEnumerable<AbacPolicyRule>> GetRules(
+        public IQueryable<AbacPolicyRule> GetRules(
             [Parent] AbacPolicy policy,
             [Service] TechtonicCmsDbContext db)
         {
-            return await db.AbacPolicyRules
+            return db.AbacPolicyRules
                 .Where(r => r.PolicyId == policy.Id)
-                .OrderBy(r => r.Order)
-                .ToListAsync();
+                .OrderBy(r => r.Order);
         }
 
-        public async Task<IEnumerable<RoleAssignmentDto>> GetAssignedToRoles(
+        public IQueryable<RoleAssignmentDto> GetAssignedToRoles(
             [Parent] AbacPolicy policy,
             [Service] TechtonicCmsDbContext db)
         {
-            var assignments = await db.RolePolicies
+            return db.RolePolicies
                 .Include(rp => rp.Role)
                 .Where(rp => rp.PolicyId == policy.Id)
                 .Select(rp => new RoleAssignmentDto
@@ -130,17 +129,14 @@ public partial class PolicyType : ObjectType<AbacPolicy>
                     AssignedAt = rp.AssignedAt,
                     ExpiresAt = rp.ExpiresAt,
                     Reason = rp.Reason
-                })
-                .ToListAsync();
-
-            return assignments;
+                });
         }
 
-        public async Task<IEnumerable<UserAssignmentDto>> GetAssignedToUsers(
+        public IQueryable<UserAssignmentDto> GetAssignedToUsers(
             [Parent] AbacPolicy policy,
             [Service] TechtonicCmsDbContext db)
         {
-            var assignments = await db.UserPolicies
+            return db.UserPolicies
                 .Include(up => up.User)
                 .Where(up => up.PolicyId == policy.Id)
                 .Select(up => new UserAssignmentDto
@@ -150,10 +146,7 @@ public partial class PolicyType : ObjectType<AbacPolicy>
                     AssignedAt = up.AssignedAt,
                     ExpiresAt = up.ExpiresAt,
                     Reason = up.Reason
-                })
-                .ToListAsync();
-
-            return assignments;
+                });
         }
     }
 }

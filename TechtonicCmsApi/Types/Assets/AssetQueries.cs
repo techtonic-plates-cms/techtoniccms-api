@@ -35,7 +35,7 @@ public class AssetQuery
     }
 
     [Authorize]
-    public async Task<IEnumerable<Asset>> Assets(
+    public async Task<IQueryable<Asset>> Assets(
         int? limit,
         int? offset,
         [Service] TechtonicCmsDbContext db,
@@ -52,7 +52,7 @@ public class AssetQuery
         if (limit.HasValue)
             query = query.Take(limit.Value);
 
-        return await query.ToListAsync();
+        return query;
     }
 
     private static Guid GetUserId(IHttpContextAccessor httpContextAccessor)

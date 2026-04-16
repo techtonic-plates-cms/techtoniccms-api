@@ -38,7 +38,7 @@ public class RoleQuery
     [UsePaging(MaxPageSize = 100)]
     [UseFiltering]
     [UseSorting]
-    public async Task<IEnumerable<RoleEntity>> Roles(
+    public IQueryable<RoleEntity> Roles(
         string? search,
         int? limit,
         int? offset,
@@ -55,7 +55,7 @@ public class RoleQuery
         if (limit.HasValue)
             query = query.Take(limit.Value);
 
-        return await query.ToListAsync();
+        return query;
     }
 }
 

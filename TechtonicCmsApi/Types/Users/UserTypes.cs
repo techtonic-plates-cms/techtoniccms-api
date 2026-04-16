@@ -53,11 +53,11 @@ public partial class UserType : ObjectType<User>
     public class UserTypeResolvers
     {
         [UseProjection]
-        public async Task<IEnumerable<RoleRefDto>> GetRoles(
+        public IQueryable<RoleRefDto> GetRoles(
         [Parent] User user,
         [Service] TechtonicCmsDbContext db)
         {
-            var userRoles = await db.UserRoles
+            return db.UserRoles
                 .Include(ur => ur.Role)
                 .Where(ur => ur.UserId == user.Id)
                 .Select(ur => new RoleRefDto
@@ -67,10 +67,7 @@ public partial class UserType : ObjectType<User>
                     Description = ur.Role.Description,
                     AssignedAt = ur.AssignedAt,
                     ExpiresAt = ur.ExpiresAt
-                })
-                .ToListAsync();
-
-            return userRoles;
+                });
         }
     }
 }

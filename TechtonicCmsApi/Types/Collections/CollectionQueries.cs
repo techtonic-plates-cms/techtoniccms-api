@@ -43,7 +43,7 @@ public class CollectionQuery
     [UsePaging(MaxPageSize = 100)]
     [UseFiltering]
     [UseSorting]
-    public async Task<IEnumerable<Collection>> CollectionsData(
+    public async Task<IQueryable<Collection>> CollectionsData(
         string? search,
         int? limit,
         int? offset,
@@ -65,7 +65,7 @@ public class CollectionQuery
         if (limit.HasValue)
             query = query.Take(limit.Value);
 
-        return await query.OrderBy(c => c.Name).ToListAsync();
+        return query.OrderBy(c => c.Name);
     }
 
     private static Guid GetUserId(IHttpContextAccessor httpContextAccessor)

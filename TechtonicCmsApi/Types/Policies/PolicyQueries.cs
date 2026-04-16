@@ -36,7 +36,7 @@ public class PolicyQuery
     }
 
     [Authorize(Policy = "Users:Read")]
-    public async Task<IEnumerable<PolicyEntity>> Policies(
+    public IQueryable<PolicyEntity> Policies(
         string? search,
         BaseResource? resourceType,
         PermissionAction? actionType,
@@ -83,7 +83,7 @@ public class PolicyQuery
             query = query.Take(limit.Value);
         }
 
-        return await query.ToListAsync();
+        return query;
     }
 }
 

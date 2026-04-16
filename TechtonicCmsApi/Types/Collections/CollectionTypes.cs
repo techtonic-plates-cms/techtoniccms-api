@@ -36,14 +36,13 @@ public partial class CollectionType : ObjectType<Collection>
             return collection.SupportedLocales.Select(s => Enum.Parse<Locale>(s)).ToArray();
         }
 
-        public async Task<IEnumerable<Field>> GetFields(
+        public IQueryable<Field> GetFields(
             [Parent] Collection collection,
             [Service] TechtonicCmsDbContext db)
         {
-            return await db.Fields
+            return db.Fields
                 .Where(f => f.CollectionId == collection.Id)
-                .OrderBy(f => f.CreatedAt)
-                .ToListAsync();
+                .OrderBy(f => f.CreatedAt);
         }
 
         public async Task<int> GetEntryCount(

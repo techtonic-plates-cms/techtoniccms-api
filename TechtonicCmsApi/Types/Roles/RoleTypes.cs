@@ -83,11 +83,11 @@ public partial class RoleType : ObjectType<Role>
     [ExtendObjectType(typeof(RoleType))]
     public class RoleTypeResolvers
     {
-        public async Task<IEnumerable<UserRefInRoleDto>> GetUsers(
+        public IQueryable<UserRefInRoleDto> GetUsers(
             [Parent] Role role,
             [Service] TechtonicCmsDbContext db)
         {
-            var roleUsers = await db.UserRoles
+            return db.UserRoles
                 .Include(ur => ur.User)
                 .Where(ur => ur.RoleId == role.Id)
                 .Select(ur => new UserRefInRoleDto
@@ -97,17 +97,14 @@ public partial class RoleType : ObjectType<Role>
                     Status = ur.User.Status,
                     AssignedAt = ur.AssignedAt,
                     ExpiresAt = ur.ExpiresAt
-                })
-                .ToListAsync();
-
-            return roleUsers;
+                });
         }
 
-        public async Task<IEnumerable<PolicyRefInRoleDto>> GetPolicies(
+        public IQueryable<PolicyRefInRoleDto> GetPolicies(
             [Parent] Role role,
             [Service] TechtonicCmsDbContext db)
         {
-            var rolePolicies = await db.RolePolicies
+            return db.RolePolicies
                 .Include(rp => rp.Policy)
                 .Where(rp => rp.RoleId == role.Id)
                 .Select(rp => new PolicyRefInRoleDto
@@ -120,10 +117,7 @@ public partial class RoleType : ObjectType<Role>
                     ActionType = rp.Policy.ActionType,
                     AssignedAt = rp.AssignedAt,
                     ExpiresAt = rp.ExpiresAt
-                })
-                .ToListAsync();
-
-            return rolePolicies;
+                });
         }
     }
 }

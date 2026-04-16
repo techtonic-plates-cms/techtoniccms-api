@@ -19,7 +19,8 @@ public class LoginPayload
 
 public class RefreshPayload
 {
-    public string AccessToken { get; set; } = "";
+    public required Token AccessToken { get; set; }
+    public required Token RefreshToken { get; set; }
 }
 
 public class LogoutPayload

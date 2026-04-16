@@ -112,10 +112,11 @@ public class AuthMutation
         var userId = Guid.Parse(tokenData.UserId);
         var (newAccessToken, newSessionId) = await authService.GenerateAccessTokenAsync(userId, session.UserName);
         var newRefresh = await authService.GenerateRefreshTokenAsync(userId, newSessionId);
-
+        var accessTokenExpiry = new DateTime().AddMinutes(15).ToUniversalTime().Subtract(DateTime.UnixEpoch).TotalSeconds;
+        var refreshTokenExpiry = new DateTime().AddDays(30).ToUniversalTime().Subtract(DateTime.UnixEpoch).TotalSeconds;
         await sessionService.DeleteSessionAsync(tokenData.SessionId, tokenData.UserId);
 
-        return new RefreshPayload { AccessToken = newAccessToken };
+        return new RefreshPayload { AccessToken = new() { TokenValue = newAccessToken, ExpiresAt = DateTime.UnixEpoch.AddSeconds(accessTokenExpiry) }, RefreshToken = new() { TokenValue = newRefresh, ExpiresAt = DateTime.UnixEpoch.AddSeconds(refreshTokenExpiry) } };
     }
 
     [Authorize]

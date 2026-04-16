@@ -8,53 +8,46 @@ using TechtonicCmsApi.Schema.TechtonicCms.Enums;
 
 namespace TechtonicCmsApi.Types.Fields;
 
-[ObjectType<Field>]
-public static partial class FieldType
+public partial class FieldType : ObjectType<Field>
 {
-    public static string GetId([Parent] Field field) => field.Id.ToString();
-
-    public static string GetCollectionId([Parent] Field field) => field.CollectionId.ToString();
-
-    [GraphQLType<NonNullType<StringType>>]
-    public static string GetName([Parent] Field field) => field.Name;
-
-    public static string? GetLabel([Parent] Field field) => field.Label;
-
-    public static string? GetDescription([Parent] Field field) => field.Description;
-
-    public static FieldDataType GetDataType([Parent] Field field) => field.DataType;
-
-    public static bool GetIsRequired([Parent] Field field) => field.IsRequired;
-
-    public static bool GetIsUnique([Parent] Field field) => field.IsUnique;
-
-    public static string? GetValidationRules([Parent] Field field) => field.ValidationRules;
-
-    public static string? GetDefaultValue([Parent] Field field) => field.DefaultValue;
-
-    public static string? GetHelpText([Parent] Field field) => field.HelpText;
-
-    public static string? GetRelatedCollectionId([Parent] Field field) =>
-        field.RelatedCollectionId?.ToString();
-
-    public static async Task<Collection?> GetRelatedCollection(
-        [Parent] Field field,
-        [Service] TechtonicCmsDbContext db)
+    protected override void Configure(IObjectTypeDescriptor<Field> descriptor)
     {
-        if (field.RelatedCollectionId is null) return null;
-        return await db.Collections.FindAsync(field.RelatedCollectionId.Value);
+        descriptor.BindFieldsExplicitly();
+
+        descriptor.Name("Field");
+
+        descriptor.Field(f => f.Id).ID().IsProjected();
+        descriptor.Field(f => f.CollectionId).ID().IsProjected();
+        descriptor.Field(f => f.Name).Type<NonNullType<StringType>>().IsProjected();
+        descriptor.Field(f => f.Label).IsProjected();
+        descriptor.Field(f => f.Description).IsProjected();
+        descriptor.Field(f => f.DataType).IsProjected();
+        descriptor.Field(f => f.IsRequired).IsProjected();
+        descriptor.Field(f => f.IsUnique).IsProjected();
+        descriptor.Field(f => f.ValidationRules).IsProjected();
+        descriptor.Field(f => f.DefaultValue).IsProjected();
+        descriptor.Field(f => f.HelpText).IsProjected();
+        descriptor.Field(f => f.RelatedCollectionId).IsProjected();
+        descriptor.Field(f => f.CreatedAt).IsProjected();
+        descriptor.Field(f => f.UpdatedAt).IsProjected();
     }
 
-    public static string? GetCreatedAt([Parent] Field field) =>
-        field.CreatedAt.ToUniversalTime().ToString("o");
-
-    public static string? GetUpdatedAt([Parent] Field field) =>
-        field.UpdatedAt.ToUniversalTime().ToString("o");
-
-    public static async Task<Collection?> GetCollection(
-        [Parent] Field field,
-        [Service] TechtonicCmsDbContext db)
+    [ExtendObjectType(typeof(FieldType))]
+    public class FieldTypeResolvers
     {
-        return await db.Collections.FindAsync(field.CollectionId);
+        public async Task<Collection?> GetRelatedCollection(
+            [Parent] Field field,
+            [Service] TechtonicCmsDbContext db)
+        {
+            if (field.RelatedCollectionId is null) return null;
+            return await db.Collections.FindAsync(field.RelatedCollectionId.Value);
+        }
+
+        public async Task<Collection?> GetCollection(
+            [Parent] Field field,
+            [Service] TechtonicCmsDbContext db)
+        {
+            return await db.Collections.FindAsync(field.CollectionId);
+        }
     }
 }

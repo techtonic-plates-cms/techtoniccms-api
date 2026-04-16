@@ -30,7 +30,7 @@ builder.Services.AddOptions<RedisOptions>()
 builder.Services.AddOptions<S3Options>()
     .Bind(builder.Configuration.GetSection("S3"));
 
-if(builder.Environment.IsDevelopment())
+if (builder.Environment.IsDevelopment())
 {
     builder.Configuration["Jwt:AccessTokenTtlMinutes"] = "1440"; // 1 day
 }
@@ -75,6 +75,10 @@ builder.Services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHand
 builder.Services.AddHttpContextAccessor();
 
 builder.AddGraphQL()
+.ModifyCostOptions(options =>
+{
+    options.MaxFieldCost = 5000;
+})
     .AddAuthorization()
     .AddProjections()
     .AddFiltering()
@@ -86,7 +90,7 @@ builder.AddGraphQL()
         options.IncludeExceptionDetails = builder.Environment.IsDevelopment();
     })
     .AddTypeModule<CollectionTypeModule>()
-    
+
     .AddTypes();
 
 var app = builder.Build();

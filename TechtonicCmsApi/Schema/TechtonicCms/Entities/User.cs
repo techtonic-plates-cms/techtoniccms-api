@@ -14,6 +14,7 @@ public class User
     public required Guid Id { get; set; }
 
     [StringLength(255)]
+    [IsProjected(true)]
     public required string Name { get; set; } = null!;
 
     [StringLength(255)]

@@ -27,146 +27,133 @@ public class UserAssignmentDto
     public string? Reason { get; set; }
 }
 
-[ObjectType<RoleAssignmentDto>]
-public static partial class RoleAssignmentType
+public partial class RoleAssignmentType : ObjectType<RoleAssignmentDto>
 {
-    public static string GetId([Parent] RoleAssignmentDto assignment) => assignment.Id.ToString();
-
-    [GraphQLType<NonNullType<StringType>>]
-    public static string GetName([Parent] RoleAssignmentDto assignment) => assignment.Name;
-
-    public static string? GetAssignedAt([Parent] RoleAssignmentDto assignment) =>
-        assignment.AssignedAt?.ToUniversalTime().ToString("o");
-
-    public static string? GetExpiresAt([Parent] RoleAssignmentDto assignment) =>
-        assignment.ExpiresAt?.ToUniversalTime().ToString("o");
-
-    public static string? GetReason([Parent] RoleAssignmentDto assignment) => assignment.Reason;
-}
-
-[ObjectType<UserAssignmentDto>]
-public static partial class UserAssignmentType
-{
-    public static string GetId([Parent] UserAssignmentDto assignment) => assignment.Id.ToString();
-
-    [GraphQLType<NonNullType<StringType>>]
-    public static string GetName([Parent] UserAssignmentDto assignment) => assignment.Name;
-
-    public static string? GetAssignedAt([Parent] UserAssignmentDto assignment) =>
-        assignment.AssignedAt?.ToUniversalTime().ToString("o");
-
-    public static string? GetExpiresAt([Parent] UserAssignmentDto assignment) =>
-        assignment.ExpiresAt?.ToUniversalTime().ToString("o");
-
-    public static string? GetReason([Parent] UserAssignmentDto assignment) => assignment.Reason;
-}
-
-[ObjectType<AbacPolicyRule>]
-public static partial class PolicyRuleType
-{
-    public static string GetId([Parent] AbacPolicyRule rule) => rule.Id.ToString();
-
-    public static string GetPolicyId([Parent] AbacPolicyRule rule) => rule.PolicyId.ToString();
-
-    public static AttributePath GetAttributePath([Parent] AbacPolicyRule rule) => rule.AttributePath;
-
-    public static OperatorType GetOperator([Parent] AbacPolicyRule rule) => rule.Operator;
-
-    [GraphQLType<NonNullType<StringType>>]
-    public static string GetExpectedValue([Parent] AbacPolicyRule rule) => rule.ExpectedValue;
-
-    public static Schema.TechtonicCms.Enums.ValueType GetValueType([Parent] AbacPolicyRule rule) => rule.ValueType;
-
-    public static string? GetDescription([Parent] AbacPolicyRule rule) => rule.Description;
-
-    public static bool GetIsActive([Parent] AbacPolicyRule rule) => rule.IsActive;
-
-    public static int GetOrder([Parent] AbacPolicyRule rule) => rule.Order;
-
-    public static string? GetCreatedAt([Parent] AbacPolicyRule rule) =>
-        rule.CreatedAt.ToUniversalTime().ToString("o");
-}
-
-[ObjectType<AbacPolicy>]
-public static partial class PolicyType
-{
-    public static string GetId([Parent] AbacPolicy policy) => policy.Id.ToString();
-
-    [GraphQLType<NonNullType<StringType>>]
-    public static string GetName([Parent] AbacPolicy policy) => policy.Name;
-
-    public static string? GetDescription([Parent] AbacPolicy policy) => policy.Description;
-
-    public static PermissionEffect GetEffect([Parent] AbacPolicy policy) => policy.Effect;
-
-    public static int GetPriority([Parent] AbacPolicy policy) => policy.Priority;
-
-    public static bool GetIsActive([Parent] AbacPolicy policy) => policy.IsActive;
-
-    public static BaseResource GetResourceType([Parent] AbacPolicy policy) => policy.ResourceType;
-
-    public static PermissionAction GetActionType([Parent] AbacPolicy policy) => policy.ActionType;
-
-    public static LogicalOperator GetRuleConnector([Parent] AbacPolicy policy) => policy.RuleConnector;
-
-    public static string? GetCreatedBy([Parent] AbacPolicy policy) => policy.CreatedBy.ToString();
-
-    public static string? GetCreatedAt([Parent] AbacPolicy policy) =>
-        policy.CreatedAt.ToUniversalTime().ToString("o");
-
-    public static string? GetUpdatedAt([Parent] AbacPolicy policy) =>
-        policy.UpdatedAt.ToUniversalTime().ToString("o");
-
-    public static string? GetLastEvaluatedAt([Parent] AbacPolicy policy) =>
-        policy.LastEvaluatedAt?.ToUniversalTime().ToString("o");
-
-    public static async Task<IEnumerable<AbacPolicyRule>> GetRules(
-        [Parent] AbacPolicy policy,
-        [Service] TechtonicCmsDbContext db)
+    protected override void Configure(IObjectTypeDescriptor<RoleAssignmentDto> descriptor)
     {
-        return await db.AbacPolicyRules
-            .Where(r => r.PolicyId == policy.Id)
-            .OrderBy(r => r.Order)
-            .ToListAsync();
+        descriptor.BindFieldsExplicitly();
+
+        descriptor.Name("RoleAssignment");
+
+        descriptor.Field(a => a.Id).ID().IsProjected();
+        descriptor.Field(a => a.Name).Type<NonNullType<StringType>>().IsProjected();
+        descriptor.Field(a => a.AssignedAt).IsProjected();
+        descriptor.Field(a => a.ExpiresAt).IsProjected();
+        descriptor.Field(a => a.Reason).IsProjected();
+    }
+}
+
+public partial class UserAssignmentType : ObjectType<UserAssignmentDto>
+{
+    protected override void Configure(IObjectTypeDescriptor<UserAssignmentDto> descriptor)
+    {
+        descriptor.BindFieldsExplicitly();
+
+        descriptor.Name("UserAssignment");
+
+        descriptor.Field(a => a.Id).ID().IsProjected();
+        descriptor.Field(a => a.Name).Type<NonNullType<StringType>>().IsProjected();
+        descriptor.Field(a => a.AssignedAt).IsProjected();
+        descriptor.Field(a => a.ExpiresAt).IsProjected();
+        descriptor.Field(a => a.Reason).IsProjected();
+    }
+}
+
+public partial class PolicyRuleType : ObjectType<AbacPolicyRule>
+{
+    protected override void Configure(IObjectTypeDescriptor<AbacPolicyRule> descriptor)
+    {
+        descriptor.BindFieldsExplicitly();
+
+        descriptor.Name("PolicyRule");
+
+        descriptor.Field(r => r.Id).ID().IsProjected();
+        descriptor.Field(r => r.PolicyId).ID().IsProjected();
+        descriptor.Field(r => r.AttributePath).IsProjected();
+        descriptor.Field(r => r.Operator).IsProjected();
+        descriptor.Field(r => r.ExpectedValue).Type<NonNullType<StringType>>().IsProjected();
+        descriptor.Field(r => r.ValueType).IsProjected();
+        descriptor.Field(r => r.Description).IsProjected();
+        descriptor.Field(r => r.IsActive).IsProjected();
+        descriptor.Field(r => r.Order).IsProjected();
+        descriptor.Field(r => r.CreatedAt).IsProjected();
+    }
+}
+
+public partial class PolicyType : ObjectType<AbacPolicy>
+{
+    protected override void Configure(IObjectTypeDescriptor<AbacPolicy> descriptor)
+    {
+        descriptor.BindFieldsExplicitly();
+
+        descriptor.Name("Policy");
+
+        descriptor.Field(p => p.Id).ID().IsProjected();
+        descriptor.Field(p => p.Name).Type<NonNullType<StringType>>().IsProjected();
+        descriptor.Field(p => p.Description).IsProjected();
+        descriptor.Field(p => p.Effect).IsProjected();
+        descriptor.Field(p => p.Priority).IsProjected();
+        descriptor.Field(p => p.IsActive).IsProjected();
+        descriptor.Field(p => p.ResourceType).IsProjected();
+        descriptor.Field(p => p.ActionType).IsProjected();
+        descriptor.Field(p => p.RuleConnector).IsProjected();
+        descriptor.Field(p => p.CreatedBy).ID().IsProjected();
+        descriptor.Field(p => p.CreatedAt).IsProjected();
+        descriptor.Field(p => p.UpdatedAt).IsProjected();
+        descriptor.Field(p => p.LastEvaluatedAt).IsProjected();
     }
 
-    public static async Task<IEnumerable<RoleAssignmentDto>> GetAssignedToRoles(
-        [Parent] AbacPolicy policy,
-        [Service] TechtonicCmsDbContext db)
+    [ExtendObjectType(typeof(PolicyType))]
+    public class PolicyTypeResolvers
     {
-        var assignments = await db.RolePolicies
-            .Include(rp => rp.Role)
-            .Where(rp => rp.PolicyId == policy.Id)
-            .Select(rp => new RoleAssignmentDto
-            {
-                Id = rp.Role.Id,
-                Name = rp.Role.Name,
-                AssignedAt = rp.AssignedAt,
-                ExpiresAt = rp.ExpiresAt,
-                Reason = rp.Reason
-            })
-            .ToListAsync();
+        public async Task<IEnumerable<AbacPolicyRule>> GetRules(
+            [Parent] AbacPolicy policy,
+            [Service] TechtonicCmsDbContext db)
+        {
+            return await db.AbacPolicyRules
+                .Where(r => r.PolicyId == policy.Id)
+                .OrderBy(r => r.Order)
+                .ToListAsync();
+        }
 
-        return assignments;
-    }
+        public async Task<IEnumerable<RoleAssignmentDto>> GetAssignedToRoles(
+            [Parent] AbacPolicy policy,
+            [Service] TechtonicCmsDbContext db)
+        {
+            var assignments = await db.RolePolicies
+                .Include(rp => rp.Role)
+                .Where(rp => rp.PolicyId == policy.Id)
+                .Select(rp => new RoleAssignmentDto
+                {
+                    Id = rp.Role.Id,
+                    Name = rp.Role.Name,
+                    AssignedAt = rp.AssignedAt,
+                    ExpiresAt = rp.ExpiresAt,
+                    Reason = rp.Reason
+                })
+                .ToListAsync();
 
-    public static async Task<IEnumerable<UserAssignmentDto>> GetAssignedToUsers(
-        [Parent] AbacPolicy policy,
-        [Service] TechtonicCmsDbContext db)
-    {
-        var assignments = await db.UserPolicies
-            .Include(up => up.User)
-            .Where(up => up.PolicyId == policy.Id)
-            .Select(up => new UserAssignmentDto
-            {
-                Id = up.User.Id,
-                Name = up.User.Name,
-                AssignedAt = up.AssignedAt,
-                ExpiresAt = up.ExpiresAt,
-                Reason = up.Reason
-            })
-            .ToListAsync();
+            return assignments;
+        }
 
-        return assignments;
+        public async Task<IEnumerable<UserAssignmentDto>> GetAssignedToUsers(
+            [Parent] AbacPolicy policy,
+            [Service] TechtonicCmsDbContext db)
+        {
+            var assignments = await db.UserPolicies
+                .Include(up => up.User)
+                .Where(up => up.PolicyId == policy.Id)
+                .Select(up => new UserAssignmentDto
+                {
+                    Id = up.User.Id,
+                    Name = up.User.Name,
+                    AssignedAt = up.AssignedAt,
+                    ExpiresAt = up.ExpiresAt,
+                    Reason = up.Reason
+                })
+                .ToListAsync();
+
+            return assignments;
+        }
     }
 }

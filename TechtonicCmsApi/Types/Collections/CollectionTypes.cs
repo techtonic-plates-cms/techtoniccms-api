@@ -8,80 +8,49 @@ using TechtonicCmsApi.Schema.TechtonicCms.Enums;
 
 namespace TechtonicCmsApi.Types.Collections;
 
-[ObjectType<Collection>]
-public static partial class CollectionType
+public partial class CollectionType : ObjectType<Collection>
 {
-    public static string GetId([Parent] Collection collection)
+    protected override void Configure(IObjectTypeDescriptor<Collection> descriptor)
     {
-        return collection.Id.ToString();
+        descriptor.BindFieldsExplicitly();
+
+        descriptor.Name("Collection");
+
+        descriptor.Field(c => c.Id).ID().IsProjected();
+        descriptor.Field(c => c.Name).Type<NonNullType<StringType>>().IsProjected();
+        descriptor.Field(c => c.Slug).Type<NonNullType<StringType>>().IsProjected();
+        descriptor.Field(c => c.Description).IsProjected();
+        descriptor.Field(c => c.Icon).IsProjected();
+        descriptor.Field(c => c.Color).IsProjected();
+        descriptor.Field(c => c.DefaultLocale).IsProjected();
+        descriptor.Field(c => c.IsLocalized).IsProjected();
+        descriptor.Field(c => c.CreatedAt).IsProjected();
+        descriptor.Field(c => c.UpdatedAt).IsProjected();
     }
 
-    [GraphQLType<NonNullType<StringType>>]
-    public static string GetName([Parent] Collection collection)
+    [ExtendObjectType(typeof(CollectionType))]
+    public class CollectionTypeResolvers
     {
-        return collection.Name;
-    }
+        public Locale[] GetSupportedLocales([Parent] Collection collection)
+        {
+            return collection.SupportedLocales.Select(s => Enum.Parse<Locale>(s)).ToArray();
+        }
 
-    [GraphQLType<NonNullType<StringType>>]
-    public static string GetSlug([Parent] Collection collection)
-    {
-        return collection.Slug;
-    }
+        public async Task<IEnumerable<Field>> GetFields(
+            [Parent] Collection collection,
+            [Service] TechtonicCmsDbContext db)
+        {
+            return await db.Fields
+                .Where(f => f.CollectionId == collection.Id)
+                .OrderBy(f => f.CreatedAt)
+                .ToListAsync();
+        }
 
-    public static string? GetDescription([Parent] Collection collection)
-    {
-        return collection.Description;
-    }
-
-    public static string? GetIcon([Parent] Collection collection)
-    {
-        return collection.Icon;
-    }
-
-    public static string? GetColor([Parent] Collection collection)
-    {
-        return collection.Color;
-    }
-
-    public static Locale GetDefaultLocale([Parent] Collection collection)
-    {
-        return collection.DefaultLocale;
-    }
-
-    public static Locale[] GetSupportedLocales([Parent] Collection collection)
-    {
-        return collection.SupportedLocales.Select(s => Enum.Parse<Locale>(s)).ToArray();
-    }
-
-    public static bool GetIsLocalized([Parent] Collection collection)
-    {
-        return collection.IsLocalized;
-    }
-
-    public static string? GetCreatedAt([Parent] Collection collection)
-    {
-        return collection.CreatedAt.ToUniversalTime().ToString("o");
-    }
-
-    public static string? GetUpdatedAt([Parent] Collection collection)
-    {
-        return collection.UpdatedAt.ToUniversalTime().ToString("o");
-    }
-
-    public static async Task<IEnumerable<Field>> GetFields(
-        [Parent] Collection collection,
-        [Service] TechtonicCmsDbContext db)
-    {
-        return await db.Fields
-            .Where(f => f.CollectionId == collection.Id)
-            .OrderBy(f => f.CreatedAt)
-            .ToListAsync();
-    }
-
-    public static async Task<int> GetEntryCount(
-        [Parent] Collection collection,
-        [Service] TechtonicCmsDbContext db)
-    {
-        return await db.Entries.CountAsync(e => e.CollectionId == collection.Id);
+        public async Task<int> GetEntryCount(
+            [Parent] Collection collection,
+            [Service] TechtonicCmsDbContext db)
+        {
+            return await db.Entries.CountAsync(e => e.CollectionId == collection.Id);
+        }
     }
 }

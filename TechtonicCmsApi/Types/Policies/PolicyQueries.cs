@@ -36,6 +36,7 @@ public class PolicyQuery
     }
 
     [Authorize(Policy = "Users:Read")]
+    [UseProjection]
     public IQueryable<PolicyEntity> Policies(
         string? search,
         BaseResource? resourceType,

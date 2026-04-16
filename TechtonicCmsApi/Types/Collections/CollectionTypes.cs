@@ -36,6 +36,7 @@ public partial class CollectionType : ObjectType<Collection>
             return collection.SupportedLocales.Select(s => Enum.Parse<Locale>(s)).ToArray();
         }
 
+        [UseProjection]
         public IQueryable<Field> GetFields(
             [Parent] Collection collection,
             [Service] TechtonicCmsDbContext db)

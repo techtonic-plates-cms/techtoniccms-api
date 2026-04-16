@@ -35,6 +35,7 @@ public class AssetQuery
     }
 
     [Authorize]
+    [UseProjection]
     public async Task<IQueryable<Asset>> Assets(
         int? limit,
         int? offset,

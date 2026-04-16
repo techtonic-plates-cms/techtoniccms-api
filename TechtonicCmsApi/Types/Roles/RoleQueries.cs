@@ -36,6 +36,7 @@ public class RoleQuery
 
     [Authorize(Policy = "Users:Read")]
     [UsePaging(MaxPageSize = 100)]
+    [UseProjection]
     [UseFiltering]
     [UseSorting]
     public IQueryable<RoleEntity> Roles(

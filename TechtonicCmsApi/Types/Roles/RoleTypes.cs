@@ -83,6 +83,7 @@ public partial class RoleType : ObjectType<Role>
     [ExtendObjectType(typeof(RoleType))]
     public class RoleTypeResolvers
     {
+        [UseProjection]
         public IQueryable<UserRefInRoleDto> GetUsers(
             [Parent] Role role,
             [Service] TechtonicCmsDbContext db)
@@ -100,6 +101,7 @@ public partial class RoleType : ObjectType<Role>
                 });
         }
 
+        [UseProjection]
         public IQueryable<PolicyRefInRoleDto> GetPolicies(
             [Parent] Role role,
             [Service] TechtonicCmsDbContext db)

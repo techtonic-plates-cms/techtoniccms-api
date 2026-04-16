@@ -106,6 +106,7 @@ public partial class PolicyType : ObjectType<AbacPolicy>
     [ExtendObjectType(typeof(PolicyType))]
     public class PolicyTypeResolvers
     {
+        [UseProjection]
         public IQueryable<AbacPolicyRule> GetRules(
             [Parent] AbacPolicy policy,
             [Service] TechtonicCmsDbContext db)
@@ -115,6 +116,7 @@ public partial class PolicyType : ObjectType<AbacPolicy>
                 .OrderBy(r => r.Order);
         }
 
+        [UseProjection]
         public IQueryable<RoleAssignmentDto> GetAssignedToRoles(
             [Parent] AbacPolicy policy,
             [Service] TechtonicCmsDbContext db)
@@ -132,6 +134,7 @@ public partial class PolicyType : ObjectType<AbacPolicy>
                 });
         }
 
+        [UseProjection]
         public IQueryable<UserAssignmentDto> GetAssignedToUsers(
             [Parent] AbacPolicy policy,
             [Service] TechtonicCmsDbContext db)

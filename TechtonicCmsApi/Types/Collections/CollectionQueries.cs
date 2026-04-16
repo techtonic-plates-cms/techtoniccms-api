@@ -41,6 +41,7 @@ public class CollectionQuery
 
     [Authorize(Policy = "Collections:Read")]
     [UsePaging(MaxPageSize = 100)]
+    [UseProjection]
     [UseFiltering]
     [UseSorting]
     public async Task<IQueryable<Collection>> CollectionsData(

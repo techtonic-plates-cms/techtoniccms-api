@@ -2,10 +2,18 @@ using TechtonicCmsApi.Schema.TechtonicCms.Entities;
 
 namespace TechtonicCmsApi.Types.Auth;
 
+public class Token
+{
+    public string TokenValue { get; set; } = "";
+    public DateTime ExpiresAt { get; set; }
+}
+
+
+
 public class LoginPayload
 {
-    public string AccessToken { get; set; } = "";
-    public string RefreshToken { get; set; } = "";
+    public required Token AccessToken { get; set; }
+    public required Token RefreshToken { get; set; }
     public User? User { get; set; }
 }
 

@@ -47,10 +47,13 @@ public class AuthMutation
         var (accessToken, sessionId) = await authService.GenerateAccessTokenAsync(user.Id, user.Name);
         var refreshToken = await authService.GenerateRefreshTokenAsync(user.Id, sessionId);
 
+        var accessTokenExpiry = new DateTime().AddMinutes(15).ToUniversalTime().Subtract(DateTime.UnixEpoch).TotalSeconds;
+        var refreshTokenExpiry = new DateTime().AddDays(30).ToUniversalTime().Subtract(DateTime.UnixEpoch).TotalSeconds;
+
         return new LoginPayload
         {
-            AccessToken = accessToken,
-            RefreshToken = refreshToken,
+            AccessToken = new Token { TokenValue = accessToken, ExpiresAt = DateTime.UnixEpoch.AddSeconds(accessTokenExpiry) },
+            RefreshToken = new Token { TokenValue = refreshToken, ExpiresAt = DateTime.UnixEpoch.AddSeconds(refreshTokenExpiry) },
             User = user
         };
     }

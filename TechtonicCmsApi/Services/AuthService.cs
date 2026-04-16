@@ -11,7 +11,7 @@ public class JwtOptions
 {
     public required string Issuer { get; set; } = "techtonic-cms";
     public int AccessTokenTtlMinutes { get; set; } = 15;
-    public int RefreshTokenTtlDays { get; set; } = 7;
+    public int RefreshTokenTtlDays { get; set; } = 30;
     public string? RsaPrivateKeyPem { get; set; }
     public string? RsaPublicKeyPem { get; set; }
 }

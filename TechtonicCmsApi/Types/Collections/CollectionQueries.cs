@@ -21,7 +21,6 @@ public class CollectionQuery
         [Service] IHttpContextAccessor httpContextAccessor)
     {
         var userId = GetUserId(httpContextAccessor);
-        await abacService.RequirePermissionAsync(userId, BaseResource.Collections, PermissionAction.Read);
 
         if (id is null && string.IsNullOrEmpty(slug))
             throw new GraphQLException(ErrorBuilder.New()
@@ -36,7 +35,21 @@ public class CollectionQuery
         else if (!string.IsNullOrEmpty(slug))
             query = query.Where(c => c.Slug == slug);
 
-        return await query.FirstOrDefaultAsync();
+        var collection = await query.FirstOrDefaultAsync();
+
+        await abacService.RequirePermissionAsync(
+            userId,
+            BaseResource.Collections,
+            PermissionAction.Read,
+            collection is null ? null : new Dictionary<string, object?>
+            {
+                ["ResourceCollectionId"] = collection.Id.ToString(),
+                ["ResourceCollectionSlug"] = collection.Slug,
+                ["ResourceCollectionCreatedBy"] = collection.CreatedBy.ToString(),
+                ["ResourceCollectionIsLocalized"] = collection.IsLocalized,
+            });
+
+        return collection;
     }
 
     [Authorize(Policy = "Collections:Read")]

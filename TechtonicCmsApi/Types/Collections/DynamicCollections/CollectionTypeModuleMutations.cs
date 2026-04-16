@@ -265,10 +265,6 @@ public partial class CollectionTypeModule
             var httpContextAccessor = ctx.Service<IHttpContextAccessor>();
 
             var userId = DynamicCollectionHelpers.GetUserId(httpContextAccessor);
-            await abacService.RequirePermissionAsync(userId, BaseResource.Entries, PermissionAction.Update, new Dictionary<string, object?>
-            {
-                ["ResourceEntryCollectionId"] = collectionId.ToString()
-            });
 
             var idStr = ctx.ArgumentValue<string>("id");
             if (!Guid.TryParse(idStr, out var entryId))
@@ -285,6 +281,16 @@ public partial class CollectionTypeModule
                     .SetMessage("Entry not found")
                     .SetCode("NOT_FOUND")
                     .Build());
+
+            await abacService.RequirePermissionAsync(userId, BaseResource.Entries, PermissionAction.Update, new Dictionary<string, object?>
+            {
+                ["ResourceEntryId"] = entry.Id.ToString(),
+                ["ResourceEntryStatus"] = entry.Status.ToString(),
+                ["ResourceEntryCreatedBy"] = entry.CreatedBy.ToString(),
+                ["ResourceEntryCollectionId"] = entry.CollectionId.ToString(),
+                ["ResourceEntryLocale"] = entry.Locale.ToString(),
+                ["ResourceEntryPublishedAt"] = entry.PublishedAt?.ToString("O"),
+            });
 
             var data = ctx.ArgumentValue<Dictionary<string, object?>?>("data")
                 ?? new Dictionary<string, object?>();
@@ -365,12 +371,18 @@ public partial class CollectionTypeModule
             var httpContextAccessor = ctx.Service<IHttpContextAccessor>();
 
             var userId = DynamicCollectionHelpers.GetUserId(httpContextAccessor);
-            await abacService.RequirePermissionAsync(userId, BaseResource.Entries, PermissionAction.Delete, new Dictionary<string, object?>
-            {
-                ["ResourceEntryCollectionId"] = collectionId.ToString()
-            });
 
             var entry = await ResolveEntryAsync(ctx, mutationDb, collectionId);
+
+            await abacService.RequirePermissionAsync(userId, BaseResource.Entries, PermissionAction.Delete, new Dictionary<string, object?>
+            {
+                ["ResourceEntryId"] = entry.Id.ToString(),
+                ["ResourceEntryStatus"] = entry.Status.ToString(),
+                ["ResourceEntryCreatedBy"] = entry.CreatedBy.ToString(),
+                ["ResourceEntryCollectionId"] = entry.CollectionId.ToString(),
+                ["ResourceEntryLocale"] = entry.Locale.ToString(),
+                ["ResourceEntryPublishedAt"] = entry.PublishedAt?.ToString("O"),
+            });
 
             entry.Status = EntryStatus.Deleted;
             entry.UpdatedAt = DateTime.UtcNow;
@@ -407,12 +419,18 @@ public partial class CollectionTypeModule
             var httpContextAccessor = ctx.Service<IHttpContextAccessor>();
 
             var userId = DynamicCollectionHelpers.GetUserId(httpContextAccessor);
-            await abacService.RequirePermissionAsync(userId, BaseResource.Entries, PermissionAction.Publish, new Dictionary<string, object?>
-            {
-                ["ResourceEntryCollectionId"] = collectionId.ToString()
-            });
 
             var entry = await ResolveEntryAsync(ctx, mutationDb, collectionId);
+
+            await abacService.RequirePermissionAsync(userId, BaseResource.Entries, PermissionAction.Publish, new Dictionary<string, object?>
+            {
+                ["ResourceEntryId"] = entry.Id.ToString(),
+                ["ResourceEntryStatus"] = entry.Status.ToString(),
+                ["ResourceEntryCreatedBy"] = entry.CreatedBy.ToString(),
+                ["ResourceEntryCollectionId"] = entry.CollectionId.ToString(),
+                ["ResourceEntryLocale"] = entry.Locale.ToString(),
+                ["ResourceEntryPublishedAt"] = entry.PublishedAt?.ToString("O"),
+            });
 
             entry.Status = EntryStatus.Published;
             entry.PublishedAt = DateTime.UtcNow;

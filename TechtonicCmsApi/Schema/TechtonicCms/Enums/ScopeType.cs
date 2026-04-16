@@ -7,6 +7,5 @@ public enum ScopeType
 {
     Global,
     CollectionSpecific,
-    EntrySpecific,
-    FieldSpecific
+    EntrySpecific
 }

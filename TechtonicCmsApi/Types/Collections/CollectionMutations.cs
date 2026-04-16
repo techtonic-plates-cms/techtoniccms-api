@@ -249,10 +249,6 @@ public class CollectionMutation
         [Service] CollectionTypeModule typeModule)
     {
         var userId = GetUserId(httpContextAccessor);
-        await abacService.RequirePermissionAsync(userId, BaseResource.Collections, PermissionAction.Update);
-
-        if (input.Fields is { Length: > 0 } || input.DeleteFieldIds is { Length: > 0 })
-            await abacService.RequirePermissionAsync(userId, BaseResource.Collections, PermissionAction.ManageSchema);
 
         var collection = await db.Collections.FindAsync(input.Id);
         if (collection is null)
@@ -260,6 +256,19 @@ public class CollectionMutation
                 .SetMessage("Collection not found")
                 .SetCode("NOT_FOUND")
                 .Build());
+
+        var collectionContext = new Dictionary<string, object?>
+        {
+            ["ResourceCollectionId"] = collection.Id.ToString(),
+            ["ResourceCollectionSlug"] = collection.Slug,
+            ["ResourceCollectionCreatedBy"] = collection.CreatedBy.ToString(),
+            ["ResourceCollectionIsLocalized"] = collection.IsLocalized,
+        };
+
+        await abacService.RequirePermissionAsync(userId, BaseResource.Collections, PermissionAction.Update, collectionContext);
+
+        if (input.Fields is { Length: > 0 } || input.DeleteFieldIds is { Length: > 0 })
+            await abacService.RequirePermissionAsync(userId, BaseResource.Collections, PermissionAction.ManageSchema, collectionContext);
 
         if (input.Name is not null)
             collection.Name = input.Name;
@@ -455,7 +464,6 @@ public class CollectionMutation
         [Service] CollectionTypeModule typeModule)
     {
         var userId = GetUserId(httpContextAccessor);
-        await abacService.RequirePermissionAsync(userId, BaseResource.Collections, PermissionAction.Delete);
 
         var collection = await db.Collections.FindAsync(id);
         if (collection is null)
@@ -463,6 +471,14 @@ public class CollectionMutation
                 .SetMessage("Collection not found")
                 .SetCode("NOT_FOUND")
                 .Build());
+
+        await abacService.RequirePermissionAsync(userId, BaseResource.Collections, PermissionAction.Delete, new Dictionary<string, object?>
+        {
+            ["ResourceCollectionId"] = collection.Id.ToString(),
+            ["ResourceCollectionSlug"] = collection.Slug,
+            ["ResourceCollectionCreatedBy"] = collection.CreatedBy.ToString(),
+            ["ResourceCollectionIsLocalized"] = collection.IsLocalized,
+        });
 
         var hasEntries = await db.Entries.AnyAsync(e => e.CollectionId == id);
         if (hasEntries)

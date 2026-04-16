@@ -23,6 +23,8 @@ public enum AttributePath
     ResourceAssetUploadedBy,
     ResourceAssetMimeType,
     ResourceAssetFileSize,
+    ResourceUserId,
+    ResourceUserStatus,
     EnvironmentCurrentTime,
     EnvironmentIpAddress,
     EnvironmentUserAgent,

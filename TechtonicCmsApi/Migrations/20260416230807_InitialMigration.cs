@@ -13,8 +13,8 @@ namespace TechtonicCmsApi.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.AlterDatabase()
-                .Annotation("Npgsql:Enum:attribute_path", "subject_id,subject_role,subject_status,subject_created_at,resource_collection_id,resource_collection_slug,resource_collection_created_by,resource_collection_is_localized,resource_entry_id,resource_entry_status,resource_entry_created_by,resource_entry_collection_id,resource_entry_locale,resource_entry_published_at,resource_asset_id,resource_asset_uploaded_by,resource_asset_mime_type,resource_asset_file_size,environment_current_time,environment_ip_address,environment_user_agent,action_type")
-                .Annotation("Npgsql:Enum:base_resource", "users,collections,entries,assets,fields")
+                .Annotation("Npgsql:Enum:attribute_path", "subject_id,subject_role,subject_status,subject_created_at,resource_collection_id,resource_collection_slug,resource_collection_created_by,resource_collection_is_localized,resource_entry_id,resource_entry_status,resource_entry_created_by,resource_entry_collection_id,resource_entry_locale,resource_entry_published_at,resource_asset_id,resource_asset_uploaded_by,resource_asset_mime_type,resource_asset_file_size,resource_user_id,resource_user_status,environment_current_time,environment_ip_address,environment_user_agent,action_type")
+                .Annotation("Npgsql:Enum:base_resource", "users,collections,entries,assets")
                 .Annotation("Npgsql:Enum:entry_status", "draft,published,archived,deleted")
                 .Annotation("Npgsql:Enum:field_data_type", "text,boolean,number,date_time,relation,asset,object")
                 .Annotation("Npgsql:Enum:locale", "en,es,fr,de,it,pt,ja,ko,zh,ar,ru")
@@ -722,8 +722,7 @@ namespace TechtonicCmsApi.Migrations
                 table: "user_roles",
                 columns: new[] { "UserId", "RoleId" },
                 unique: true);
-                
-         // CMS JSONB extraction functions for querying dynamic field values.
+           // CMS JSONB extraction functions for querying dynamic field values.
             // Each function extracts a typed value from a JSONB document by key.
             // IMMUTABLE = same inputs always produce same output (required for expression indexes).
             // STRICT = returns NULL automatically if any input is NULL (handles missing keys).

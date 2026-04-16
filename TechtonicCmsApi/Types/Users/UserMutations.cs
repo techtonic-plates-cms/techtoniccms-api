@@ -116,13 +116,19 @@ public class UserMutation
         [Service] IHttpContextAccessor httpContextAccessor)
     {
         var currentUserId = GetUserId(httpContextAccessor);
-        
+
         var user = await db.Users.FindAsync(input.Id);
         if (user is null)
             throw new GraphQLException(ErrorBuilder.New()
                 .SetMessage("User not found")
                 .SetCode("NOT_FOUND")
                 .Build());
+
+        await abacService.RequirePermissionAsync(currentUserId, BaseResource.Users, PermissionAction.Update, new Dictionary<string, object?>
+        {
+            ["ResourceUserId"] = user.Id.ToString(),
+            ["ResourceUserStatus"] = user.Status.ToString(),
+        });
 
         if (input.Name is not null)
             user.Name = input.Name;
@@ -157,11 +163,16 @@ public class UserMutation
                 .SetCode("FORBIDDEN")
                 .Build());
 
-        await sessionService.DeleteAllUserSessionsAsync(id.ToString());
-
         var user = await db.Users.FindAsync(id);
         if (user is not null)
         {
+            await abacService.RequirePermissionAsync(currentUserId, BaseResource.Users, PermissionAction.Delete, new Dictionary<string, object?>
+            {
+                ["ResourceUserId"] = user.Id.ToString(),
+                ["ResourceUserStatus"] = user.Status.ToString(),
+            });
+
+            await sessionService.DeleteAllUserSessionsAsync(id.ToString());
             db.Users.Remove(user);
             await db.SaveChangesAsync();
         }
@@ -303,6 +314,12 @@ public class UserMutation
                 .SetCode("NOT_FOUND")
                 .Build());
 
+        await abacService.RequirePermissionAsync(currentUserId, BaseResource.Users, PermissionAction.Activate, new Dictionary<string, object?>
+        {
+            ["ResourceUserId"] = user.Id.ToString(),
+            ["ResourceUserStatus"] = user.Status.ToString(),
+        });
+
         user.Status = UserStatus.Active;
         user.LastEditTime = DateTime.UtcNow;
         await db.SaveChangesAsync();
@@ -332,6 +349,12 @@ public class UserMutation
                 .SetMessage("User not found")
                 .SetCode("NOT_FOUND")
                 .Build());
+
+        await abacService.RequirePermissionAsync(currentUserId, BaseResource.Users, PermissionAction.Deactivate, new Dictionary<string, object?>
+        {
+            ["ResourceUserId"] = user.Id.ToString(),
+            ["ResourceUserStatus"] = user.Status.ToString(),
+        });
 
         user.Status = UserStatus.Inactive;
         user.LastEditTime = DateTime.UtcNow;
@@ -364,6 +387,12 @@ public class UserMutation
                 .SetCode("NOT_FOUND")
                 .Build());
 
+        await abacService.RequirePermissionAsync(currentUserId, BaseResource.Users, PermissionAction.Ban, new Dictionary<string, object?>
+        {
+            ["ResourceUserId"] = user.Id.ToString(),
+            ["ResourceUserStatus"] = user.Status.ToString(),
+        });
+
         user.Status = UserStatus.Banned;
         user.LastEditTime = DateTime.UtcNow;
         await db.SaveChangesAsync();
@@ -388,6 +417,12 @@ public class UserMutation
                 .SetMessage("User not found")
                 .SetCode("NOT_FOUND")
                 .Build());
+
+        await abacService.RequirePermissionAsync(currentUserId, BaseResource.Users, PermissionAction.Unban, new Dictionary<string, object?>
+        {
+            ["ResourceUserId"] = user.Id.ToString(),
+            ["ResourceUserStatus"] = user.Status.ToString(),
+        });
 
         user.Status = UserStatus.Active;
         user.LastEditTime = DateTime.UtcNow;

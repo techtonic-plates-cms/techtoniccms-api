@@ -38,7 +38,12 @@ public class AssetMutation
             userId,
             BaseResource.Assets,
             PermissionAction.Update,
-            new() { { "OwnerId", asset.UploadedBy } });
+            new() {
+                { "ResourceAssetId", asset.Id.ToString() },
+                { "ResourceAssetUploadedBy", asset.UploadedBy.ToString() },
+                { "ResourceAssetMimeType", asset.MimeType },
+                { "ResourceAssetFileSize", asset.FileSize },
+            });
         if (input.Alt is not null)
             asset.Alt = input.Alt;
         if (input.Caption is not null)
@@ -68,7 +73,12 @@ public class AssetMutation
             userId,
             BaseResource.Assets,
             PermissionAction.Delete,
-            new() { { "OwnerId", asset.UploadedBy } });
+            new() {
+                { "ResourceAssetId", asset.Id.ToString() },
+                { "ResourceAssetUploadedBy", asset.UploadedBy.ToString() },
+                { "ResourceAssetMimeType", asset.MimeType },
+                { "ResourceAssetFileSize", asset.FileSize },
+            });
         try
         {
             await s3Service.DeleteAsync(asset.Path);

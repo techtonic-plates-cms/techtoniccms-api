@@ -29,7 +29,12 @@ public class AssetQuery
             userId,
             BaseResource.Assets,
             PermissionAction.Read,
-            new() { { "OwnerId", asset.UploadedBy } });
+            new() {
+                { "ResourceAssetId", asset.Id.ToString() },
+                { "ResourceAssetUploadedBy", asset.UploadedBy.ToString() },
+                { "ResourceAssetMimeType", asset.MimeType },
+                { "ResourceAssetFileSize", asset.FileSize },
+            });
 
         return asset;
     }
@@ -46,7 +51,7 @@ public class AssetQuery
         var userId = GetUserId(httpContextAccessor);
         await abacService.RequirePermissionAsync(userId, BaseResource.Assets, PermissionAction.Read);
 
-        IQueryable<Asset> query = db.Assets;
+        IQueryable<Asset> query = db.Assets.Where(a => a.IsPublic || a.UploadedBy == userId);
 
         if (offset.HasValue)
             query = query.Skip(offset.Value);

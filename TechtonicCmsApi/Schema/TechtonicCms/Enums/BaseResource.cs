@@ -8,6 +8,5 @@ public enum BaseResource
     Users,
     Collections,
     Entries,
-    Assets,
-    Fields
+    Assets
 }

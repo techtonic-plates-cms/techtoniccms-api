@@ -23,7 +23,6 @@ public class UserQuery
         [Service] IHttpContextAccessor httpContextAccessor)
     {
         var userId = GetUserId(httpContextAccessor);
-        await abacService.RequirePermissionAsync(userId, BaseResource.Users, PermissionAction.Read);
 
         if (id is null && string.IsNullOrEmpty(name))
             throw new GraphQLException(ErrorBuilder.New()
@@ -38,7 +37,19 @@ public class UserQuery
         else if (!string.IsNullOrEmpty(name))
             query = query.Where(u => u.Name == name);
 
-        return await query.FirstOrDefaultAsync();
+        var user = await query.FirstOrDefaultAsync();
+
+        await abacService.RequirePermissionAsync(
+            userId,
+            BaseResource.Users,
+            PermissionAction.Read,
+            user is null ? null : new Dictionary<string, object?>
+            {
+                ["ResourceUserId"] = user.Id.ToString(),
+                ["ResourceUserStatus"] = user.Status.ToString(),
+            });
+
+        return user;
     }
 
     [Authorize]

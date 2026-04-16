@@ -286,32 +286,38 @@ public partial class CollectionTypeModule
                     .SetCode("NOT_FOUND")
                     .Build());
 
-            var name = ctx.ArgumentValue<string>("name");
-            var slug = ctx.ArgumentValue<string>("slug");
-            var localeArg = ctx.ArgumentValue<Locale?>("locale");
-            var statusArg = ctx.ArgumentValue<EntryStatus?>("status");
             var data = ctx.ArgumentValue<Dictionary<string, object?>?>("data")
                 ?? new Dictionary<string, object?>();
 
-            // Apply static field updates
-            if (name is not null) entry.Name = name;
-            if (slug is not null)
+            // Apply static field updates — only when the argument was explicitly sent.
+            // ArgumentOptional<T>.HasValue is false when the argument is absent from the request,
+            // ensuring omitted fields are never overwritten.
+            var nameOpt = ctx.ArgumentOptional<string?>("name");
+            if (nameOpt.HasValue)
+                entry.Name = nameOpt.Value;
+
+            var slugOpt = ctx.ArgumentOptional<string?>("slug");
+            if (slugOpt.HasValue && slugOpt.Value is not null)
             {
                 var slugConflict = await mutationDb.Entries
-                    .AnyAsync(e => e.CollectionId == collectionId && e.Slug == slug && e.Id != entryId);
+                    .AnyAsync(e => e.CollectionId == collectionId && e.Slug == slugOpt.Value && e.Id != entryId);
                 if (slugConflict)
                     throw new GraphQLException(ErrorBuilder.New()
-                        .SetMessage($"An entry with slug '{slug}' already exists in this collection")
+                        .SetMessage($"An entry with slug '{slugOpt.Value}' already exists in this collection")
                         .SetCode("CONFLICT")
                         .Build());
-                entry.Slug = slug;
+                entry.Slug = slugOpt.Value;
             }
-            if (localeArg.HasValue)
-                entry.Locale = localeArg.Value;
-            if (statusArg.HasValue)
+
+            var localeOpt = ctx.ArgumentOptional<Locale?>("locale");
+            if (localeOpt.HasValue && localeOpt.Value.HasValue)
+                entry.Locale = localeOpt.Value.Value;
+
+            var statusOpt = ctx.ArgumentOptional<EntryStatus?>("status");
+            if (statusOpt.HasValue && statusOpt.Value.HasValue)
             {
-                entry.Status = statusArg.Value;
-                if (statusArg.Value == EntryStatus.Published && entry.PublishedAt is null)
+                entry.Status = statusOpt.Value.Value;
+                if (statusOpt.Value.Value == EntryStatus.Published && entry.PublishedAt is null)
                     entry.PublishedAt = DateTime.UtcNow;
             }
 
@@ -518,6 +524,8 @@ public partial class CollectionTypeModule
         var scalarChanged = false;
         var relationChanges = new Dictionary<Guid, string?>();
 
+        // HotChocolate only populates the dictionary with fields the client explicitly sent;
+        // absent optional fields are never added with null, so TryGetValue here means "was provided".
         foreach (var f in collectionFields)
         {
             if (!data.TryGetValue(f.Name, out var argVal))

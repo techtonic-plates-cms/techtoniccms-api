@@ -26,7 +26,7 @@ public class Collection
     public string? Description { get; set; }
 
     [StringLength(100)]
-    public string? Icon { get; set; }
+    public Asset? Icon { get; set; }
 
     [StringLength(7)]
     public string? Color { get; set; }

@@ -67,7 +67,7 @@ public class AuthMutation
         ClaimsPrincipal principal;
         try
         {
-            principal = authService.ValidateAccessToken(refreshToken);
+            principal = authService.ValidateRefreshToken(refreshToken);
         }
         catch
         {

@@ -10,7 +10,7 @@ public record RefreshTokenData(string UserId, string SessionId, DateTime Created
 public class SessionService
 {
     private static readonly TimeSpan SessionTtl = TimeSpan.FromMinutes(15);
-    private static readonly TimeSpan RefreshTokenTtl = TimeSpan.FromDays(7);
+    private static readonly TimeSpan RefreshTokenTtl = TimeSpan.FromDays(30);
 
     private readonly IDatabase _db;
 

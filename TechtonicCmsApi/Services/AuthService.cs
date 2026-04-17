@@ -128,6 +128,26 @@ public class AuthService
         return principal;
     }
 
+        public ClaimsPrincipal ValidateRefreshToken(string token)
+    {
+        var handler = new JwtSecurityTokenHandler();
+        var principal = handler.ValidateToken(token, _tokenValidationParameters, out var validatedToken);
+
+        if (validatedToken is not JwtSecurityToken jwtToken ||
+            jwtToken.Header.Alg != SecurityAlgorithms.RsaSha256)
+        {
+            throw new InvalidOperationException("Invalid token algorithm.");
+        }
+
+        var typeClaim = principal.FindFirst("type");
+        if (typeClaim is not null && typeClaim.Value != "refresh")
+        {
+            throw new InvalidOperationException("Access tokens cannot be used for refresh.");
+        }
+
+        return principal;
+    }
+
     public SecurityKey GetPublicKey()
     {
         return _rsaSecurityKey;

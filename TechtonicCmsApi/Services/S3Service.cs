@@ -21,17 +21,29 @@ public class S3Service
     private readonly IAmazonS3 _s3;
     private readonly S3Options _options;
 
+
+
     public S3Service(IOptions<S3Options> options)
     {
         _options = options.Value;
         var config = new AmazonS3Config
         {
             ServiceURL = _options.Endpoint,
-            RegionEndpoint = Amazon.RegionEndpoint.GetBySystemName(_options.Region),
+
             ForcePathStyle = true
         };
+
+        if (_options.Region is not null)
+        {
+            config.RegionEndpoint = Amazon.RegionEndpoint.GetBySystemName(_options.Region); 
+        }
         var credentials = new BasicAWSCredentials(_options.AccessKey, _options.SecretKey);
         _s3 = new AmazonS3Client(credentials, config);
+
+        if (!AmazonS3Util.DoesS3BucketExistV2Async(_s3, _options.Bucket).GetAwaiter().GetResult())
+        {
+            _s3.PutBucketAsync(new PutBucketRequest { BucketName = _options.Bucket }).GetAwaiter().GetResult();
+        }
     }
 
     public async Task<string> UploadAsync(string key, Stream body, string contentType)

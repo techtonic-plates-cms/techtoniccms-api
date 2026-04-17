@@ -37,7 +37,8 @@ services:
     security_opt:
       - label=disable
     ports:
-      - "9000:9000"
+      - "9900:9000"
+      - "9901:9001"
     volumes:
       - rustfs_data:/data
       - rustfs_logs:/logs

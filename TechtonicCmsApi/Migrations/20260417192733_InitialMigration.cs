@@ -113,34 +113,6 @@ namespace TechtonicCmsApi.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "collections",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
-                    CreatedBy = table.Column<Guid>(type: "uuid", nullable: false),
-                    Name = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
-                    Slug = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
-                    Description = table.Column<string>(type: "text", nullable: true),
-                    Icon = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
-                    Color = table.Column<string>(type: "character varying(7)", maxLength: 7, nullable: true),
-                    DefaultLocale = table.Column<int>(type: "integer", nullable: false, defaultValue: 0),
-                    SupportedLocales = table.Column<string[]>(type: "text[]", nullable: false, defaultValue: new[] { "en" }),
-                    IsLocalized = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
-                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_collections", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_collections_users_CreatedBy",
-                        column: x => x.CreatedBy,
-                        principalTable: "users",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "resource_ownerships",
                 columns: table => new
                 {
@@ -291,6 +263,39 @@ namespace TechtonicCmsApi.Migrations
                         principalTable: "users",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "collections",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
+                    CreatedBy = table.Column<Guid>(type: "uuid", nullable: false),
+                    Name = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
+                    Slug = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
+                    Description = table.Column<string>(type: "text", nullable: true),
+                    IconId = table.Column<Guid>(type: "uuid", nullable: true),
+                    Color = table.Column<string>(type: "character varying(7)", maxLength: 7, nullable: true),
+                    DefaultLocale = table.Column<int>(type: "integer", nullable: false, defaultValue: 0),
+                    SupportedLocales = table.Column<string[]>(type: "text[]", nullable: false, defaultValue: new[] { "en" }),
+                    IsLocalized = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_collections", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_collections_assets_IconId",
+                        column: x => x.IconId,
+                        principalTable: "assets",
+                        principalColumn: "Id");
+                    table.ForeignKey(
+                        name: "FK_collections_users_CreatedBy",
+                        column: x => x.CreatedBy,
+                        principalTable: "users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -592,6 +597,11 @@ namespace TechtonicCmsApi.Migrations
                 column: "CreatedBy");
 
             migrationBuilder.CreateIndex(
+                name: "IX_collections_IconId",
+                table: "collections",
+                column: "IconId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_collections_Slug",
                 table: "collections",
                 column: "Slug",
@@ -722,7 +732,7 @@ namespace TechtonicCmsApi.Migrations
                 table: "user_roles",
                 columns: new[] { "UserId", "RoleId" },
                 unique: true);
-           // CMS JSONB extraction functions for querying dynamic field values.
+          // CMS JSONB extraction functions for querying dynamic field values.
             // Each function extracts a typed value from a JSONB document by key.
             // IMMUTABLE = same inputs always produce same output (required for expression indexes).
             // STRICT = returns NULL automatically if any input is NULL (handles missing keys).
@@ -795,10 +805,10 @@ namespace TechtonicCmsApi.Migrations
                 name: "roles");
 
             migrationBuilder.DropTable(
-                name: "assets");
+                name: "collections");
 
             migrationBuilder.DropTable(
-                name: "collections");
+                name: "assets");
 
             migrationBuilder.DropTable(
                 name: "users");

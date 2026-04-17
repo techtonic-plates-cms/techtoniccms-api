@@ -92,7 +92,8 @@ public class CreateCollectionInput
 
     public string? Description { get; set; }
 
-    public string? Icon { get; set; }
+    [GraphQLType<IdType>]
+    public Guid? IconId { get; set; }
 
     public string? Color { get; set; }
 
@@ -116,7 +117,7 @@ public class UpdateCollectionInput
 
     public string? Description { get; set; }
 
-    public string? Icon { get; set; }
+    public Guid? IconId { get; set; }
 
     public string? Color { get; set; }
 
@@ -161,7 +162,7 @@ public class CollectionMutation
             Name = input.Name,
             Slug = input.Slug,
             Description = input.Description,
-            Icon = input.Icon,
+            Icon = db.Assets.Where(a => a.Id == input.IconId).FirstOrDefault(),
             Color = input.Color,
             DefaultLocale = defaultLocale,
             SupportedLocales = supportedLocales.Select(l => l.ToString()).ToArray(),
@@ -288,8 +289,8 @@ public class CollectionMutation
         if (input.Description is not null)
             collection.Description = input.Description;
 
-        if (input.Icon is not null)
-            collection.Icon = input.Icon;
+        if (input.IconId is not null)
+            collection.Icon = db.Assets.Where(a => a.Id == input.IconId).FirstOrDefault();
 
         if (input.Color is not null)
             collection.Color = input.Color;

@@ -381,9 +381,8 @@ namespace TechtonicCmsApi.Migrations
                     b.Property<string>("Description")
                         .HasColumnType("text");
 
-                    b.Property<string>("Icon")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
+                    b.Property<Guid?>("IconId")
+                        .HasColumnType("uuid");
 
                     b.Property<bool>("IsLocalized")
                         .ValueGeneratedOnAdd()
@@ -414,6 +413,8 @@ namespace TechtonicCmsApi.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CreatedBy");
+
+                    b.HasIndex("IconId");
 
                     b.HasIndex("Slug")
                         .IsUnique();
@@ -904,7 +905,13 @@ namespace TechtonicCmsApi.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("TechtonicCmsApi.Schema.TechtonicCms.Entities.Asset", "Icon")
+                        .WithMany()
+                        .HasForeignKey("IconId");
+
                     b.Navigation("CreatedByUser");
+
+                    b.Navigation("Icon");
                 });
 
             modelBuilder.Entity("TechtonicCmsApi.Schema.TechtonicCms.Entities.Entry", b =>

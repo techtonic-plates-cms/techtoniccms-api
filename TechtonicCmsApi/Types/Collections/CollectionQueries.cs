@@ -13,6 +13,7 @@ namespace TechtonicCmsApi.Types.Collections;
 public class CollectionQuery
 {
     [Authorize(Policy = "Collections:Read")]
+    [UseProjection]
     public async Task<Collection?> CollectionData(
         Guid? id,
         string? slug,

@@ -20,12 +20,14 @@ public partial class CollectionType : ObjectType<Collection>
         descriptor.Field(c => c.Name).Type<NonNullType<StringType>>().IsProjected();
         descriptor.Field(c => c.Slug).Type<NonNullType<StringType>>().IsProjected();
         descriptor.Field(c => c.Description).IsProjected();
-        descriptor.Field(c => c.Icon).IsProjected();
+
         descriptor.Field(c => c.Color).IsProjected();
         descriptor.Field(c => c.DefaultLocale).IsProjected();
         descriptor.Field(c => c.IsLocalized).IsProjected();
         descriptor.Field(c => c.CreatedAt).IsProjected();
         descriptor.Field(c => c.UpdatedAt).IsProjected();
+        
+        descriptor.Field(c => c.Icon);
     }
 
     [ExtendObjectType(typeof(CollectionType))]

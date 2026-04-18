@@ -155,14 +155,14 @@ public class CollectionMutation
 
         var supportedLocales = input.SupportedLocales?.Select(l => l).ToArray() ?? [Locale.En];
         var now = DateTime.UtcNow;
-
+        var icon = db.Assets.Where(a => a.Id == input.IconId).FirstOrDefault();
         var collection = new Collection
         {
             Id = Guid.NewGuid(),
             Name = input.Name,
             Slug = input.Slug,
             Description = input.Description,
-            Icon = db.Assets.Where(a => a.Id == input.IconId).FirstOrDefault(),
+            Icon = icon,
             Color = input.Color,
             DefaultLocale = defaultLocale,
             SupportedLocales = supportedLocales.Select(l => l.ToString()).ToArray(),

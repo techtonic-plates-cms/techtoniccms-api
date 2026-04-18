@@ -97,6 +97,57 @@ public static class AdminBootstrapService
             Console.WriteLine("Admin policies created and assigned");
         }
 
+        var creatorPolicies = new[]
+        {
+            (Name: "collections-read-by-creator",          Action: PermissionAction.Read),
+            (Name: "collections-update-by-creator",        Action: PermissionAction.Update),
+            (Name: "collections-delete-by-creator",        Action: PermissionAction.Delete),
+            (Name: "collections-manageschema-by-creator",  Action: PermissionAction.ManageSchema),
+        };
+
+        foreach (var (name, action) in creatorPolicies)
+        {
+            var exists = await db.AbacPolicies.AnyAsync(p => p.Name == name);
+            if (exists) continue;
+
+            var now = DateTime.UtcNow;
+            var policyId = Guid.NewGuid();
+            var policy = new AbacPolicy
+            {
+                Id = policyId,
+                Name = name,
+                Description = $"Allow collection {action.ToString().ToLowerInvariant()} for the collection's creator",
+                Effect = PermissionEffect.Allow,
+                Priority = 500,
+                IsActive = true,
+                ResourceType = BaseResource.Collections,
+                ActionType = action,
+                RuleConnector = LogicalOperator.And,
+                CreatedBy = adminUser.Id,
+                CreatedAt = now,
+                UpdatedAt = now,
+                Rules =
+                [
+                    new AbacPolicyRule
+                    {
+                        Id = Guid.NewGuid(),
+                        PolicyId = policyId,
+                        AttributePath = AttributePath.ResourceCollectionCreatedBy,
+                        Operator = OperatorType.EqContextRef,
+                        ExpectedValue = nameof(AttributePath.SubjectId),
+                        ValueType = Schema.TechtonicCms.Enums.ValueType.Uuid,
+                        IsActive = true,
+                        Order = 1,
+                        CreatedAt = now
+                    }
+                ]
+            };
+
+            db.AbacPolicies.Add(policy);
+        }
+
+        await db.SaveChangesAsync();
+
         var hasAdminRole = await db.UserRoles
             .AnyAsync(ur => ur.UserId == adminUser.Id && ur.RoleId == adminRole.Id);
 

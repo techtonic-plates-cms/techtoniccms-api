@@ -18,5 +18,6 @@ public enum OperatorType
     EndsWith,
     IsNull,
     IsNotNull,
-    Regex
+    Regex,
+    EqContextRef
 }

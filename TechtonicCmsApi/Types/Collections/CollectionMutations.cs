@@ -239,6 +239,32 @@ public class CollectionMutation
 
         typeModule.TriggerTypesChanged();
 
+        var creatorPolicyNames = new[]
+        {
+            "collections-read-by-creator",
+            "collections-update-by-creator",
+            "collections-delete-by-creator",
+            "collections-manageschema-by-creator"
+        };
+
+        var policies = await db.AbacPolicies
+            .Where(p => creatorPolicyNames.Contains(p.Name))
+            .ToListAsync();
+
+        if (policies.Count > 0)
+        {
+            var assignedAt = DateTime.UtcNow;
+            db.UserPolicies.AddRange(policies.Select(p => new UserPolicy
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                PolicyId = p.Id,
+                AssignedBy = userId,
+                AssignedAt = assignedAt
+            }));
+            await db.SaveChangesAsync();
+        }
+
         return collection;
     }
 

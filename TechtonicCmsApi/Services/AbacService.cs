@@ -390,6 +390,8 @@ public class AbacService
             OperatorType.StartsWith => actualStr.StartsWith(expected, StringComparison.OrdinalIgnoreCase),
             OperatorType.EndsWith => actualStr.EndsWith(expected, StringComparison.OrdinalIgnoreCase),
             OperatorType.Regex => Regex.IsMatch(actualStr, expected, RegexOptions.None, TimeSpan.FromSeconds(1)),
+            OperatorType.EqContextRef => context.TryGetValue(expected, out var refVal)
+                && string.Equals(actualStr, refVal?.ToString() ?? "", StringComparison.OrdinalIgnoreCase),
             _ => false
         };
     }

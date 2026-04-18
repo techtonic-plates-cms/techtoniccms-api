@@ -10,7 +10,7 @@ namespace TechtonicCmsApi.Services;
 public class S3Options
 {
     public string Endpoint { get; set; } = "http://localhost:9000";
-    public string Region { get; set; } = "us-east-1";
+    public string? Region { get; set; } = null;
     public string AccessKey { get; set; } = "";
     public string SecretKey { get; set; } = "";
     public string Bucket { get; set; } = "techtonic-cms";

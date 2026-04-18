@@ -13,6 +13,7 @@ namespace TechtonicCmsApi.Types.Assets;
 public class AssetQuery
 {
     [Authorize]
+    [UseProjection]
     public async Task<Asset?> Asset(
         Guid id,
         [Service] TechtonicCmsDbContext db,
@@ -41,6 +42,8 @@ public class AssetQuery
 
     [Authorize]
     [UseProjection]
+    [UseFiltering]
+    [UseSorting]
     public async Task<IQueryable<Asset>> Assets(
         int? limit,
         int? offset,

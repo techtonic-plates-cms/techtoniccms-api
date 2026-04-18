@@ -155,7 +155,8 @@ public class CollectionMutation
 
         var supportedLocales = input.SupportedLocales?.Select(l => l).ToArray() ?? [Locale.En];
         var now = DateTime.UtcNow;
-        var icon = db.Assets.Where(a => a.Id == input.IconId).FirstOrDefault();
+
+        var icon = await ValidateIconAsync(input.IconId, db);
         var collection = new Collection
         {
             Id = Guid.NewGuid(),
@@ -290,7 +291,10 @@ public class CollectionMutation
             collection.Description = input.Description;
 
         if (input.IconId is not null)
-            collection.Icon = db.Assets.Where(a => a.Id == input.IconId).FirstOrDefault();
+        {
+            var icon = await ValidateIconAsync(input.IconId, db);
+            collection.Icon = icon;
+        }
 
         if (input.Color is not null)
             collection.Color = input.Color;
@@ -494,6 +498,27 @@ public class CollectionMutation
         typeModule.TriggerTypesChanged();
 
         return true;
+    }
+
+    private static async Task<Asset?> ValidateIconAsync(Guid? iconId, TechtonicCmsDbContext db)
+    {
+        if (!iconId.HasValue)
+            return null;
+
+        var icon = await db.Assets.FindAsync(iconId.Value);
+        if (icon is null)
+            throw new GraphQLException(ErrorBuilder.New()
+                .SetMessage($"Asset with id '{iconId}' not found")
+                .SetCode("NOT_FOUND")
+                .Build());
+
+        if (!icon.MimeType.StartsWith("image/"))
+            throw new GraphQLException(ErrorBuilder.New()
+                .SetMessage("Icon must be an image file")
+                .SetCode("BAD_REQUEST")
+                .Build());
+
+        return icon;
     }
 
     private static Guid GetUserId(IHttpContextAccessor httpContextAccessor)

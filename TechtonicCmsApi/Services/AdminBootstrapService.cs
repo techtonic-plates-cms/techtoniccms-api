@@ -65,8 +65,8 @@ public static class AdminBootstrapService
                     var policy = new AbacPolicy
                     {
                         Id = Guid.NewGuid(),
-                        Name = $"admin-{resource.ToString().ToLowerInvariant()}-{action.ToString().ToLowerInvariant()}",
-                        Description = $"Admin full access to {action.ToString().ToLowerInvariant()} on {resource.ToString().ToLowerInvariant()}",
+                        Name = $"{resource.ToString().ToLowerInvariant()}-{action.ToString().ToLowerInvariant()}",
+                        Description = $"Full access to {action.ToString().ToLowerInvariant()} on {resource.ToString().ToLowerInvariant()}",
                         Effect = PermissionEffect.Allow,
                         Priority = 1000,
                         IsActive = true,

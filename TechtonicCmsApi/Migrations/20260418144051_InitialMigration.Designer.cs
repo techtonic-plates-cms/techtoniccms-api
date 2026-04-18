@@ -13,7 +13,7 @@ using TechtonicCmsApi.Contexts;
 namespace TechtonicCmsApi.Migrations
 {
     [DbContext(typeof(TechtonicCmsDbContext))]
-    [Migration("20260417192733_InitialMigration")]
+    [Migration("20260418144051_InitialMigration")]
     partial class InitialMigration
     {
         /// <inheritdoc />
@@ -578,9 +578,6 @@ namespace TechtonicCmsApi.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
-
-                    b.Property<string>("ValidationRules")
-                        .HasColumnType("text");
 
                     b.HasKey("Id");
 

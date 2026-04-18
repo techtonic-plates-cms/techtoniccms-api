@@ -24,7 +24,7 @@ public partial class FieldType : ObjectType<Field>
         descriptor.Field(f => f.DataType).IsProjected();
         descriptor.Field(f => f.IsRequired).IsProjected();
         descriptor.Field(f => f.IsUnique).IsProjected();
-        descriptor.Field(f => f.ValidationRules).IsProjected();
+       // descriptor.Field(f => f.ValidationRules).IsProjected();
         descriptor.Field(f => f.DefaultValue).IsProjected();
         descriptor.Field(f => f.HelpText).IsProjected();
         descriptor.Field(f => f.RelatedCollectionId).IsProjected();

@@ -349,7 +349,6 @@ namespace TechtonicCmsApi.Migrations
                     Description = table.Column<string>(type: "text", nullable: true),
                     IsRequired = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false),
                     IsUnique = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false),
-                    ValidationRules = table.Column<string>(type: "text", nullable: true),
                     DefaultValue = table.Column<string>(type: "text", nullable: true),
                     HelpText = table.Column<string>(type: "character varying(1024)", maxLength: 1024, nullable: true),
                     CreatedBy = table.Column<Guid>(type: "uuid", nullable: false),
@@ -732,7 +731,7 @@ namespace TechtonicCmsApi.Migrations
                 table: "user_roles",
                 columns: new[] { "UserId", "RoleId" },
                 unique: true);
-          // CMS JSONB extraction functions for querying dynamic field values.
+             // CMS JSONB extraction functions for querying dynamic field values.
             // Each function extracts a typed value from a JSONB document by key.
             // IMMUTABLE = same inputs always produce same output (required for expression indexes).
             // STRICT = returns NULL automatically if any input is NULL (handles missing keys).

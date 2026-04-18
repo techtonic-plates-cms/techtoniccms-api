@@ -44,7 +44,7 @@ public class FieldDefinitionInput
 
     public bool? IsUnique { get; set; }
 
-    public string? ValidationRules { get; set; }
+ //   public string? ValidationRules { get; set; }
 
     public string? DefaultValue { get; set; }
 
@@ -72,7 +72,7 @@ public class FieldUpdateDefinitionInput
     public bool? IsUnique { get; set; }
 
 
-    public string? ValidationRules { get; set; }
+  //  public string? ValidationRules { get; set; }
 
     public string? DefaultValue { get; set; }
 
@@ -224,7 +224,7 @@ public class CollectionMutation
                     DataType = dataType,
                     IsRequired = fieldInput.IsRequired ?? false,
                     IsUnique = fieldInput.IsUnique ?? false,
-                    ValidationRules = fieldInput.ValidationRules,
+              //      ValidationRules = fieldInput.ValidationRules,
                     DefaultValue = fieldInput.DefaultValue,
                     HelpText = fieldInput.HelpText,
                     RelatedCollectionId = relatedCollectionId,
@@ -382,7 +382,7 @@ public class CollectionMutation
 
                     if (fieldInput.IsRequired.HasValue) existing.IsRequired = fieldInput.IsRequired.Value;
                     if (fieldInput.IsUnique.HasValue) existing.IsUnique = fieldInput.IsUnique.Value;
-                    if (fieldInput.ValidationRules is not null) existing.ValidationRules = fieldInput.ValidationRules;
+                //    if (fieldInput.ValidationRules is not null) existing.ValidationRules = fieldInput.ValidationRules;
                     if (fieldInput.DefaultValue is not null) existing.DefaultValue = fieldInput.DefaultValue;
                     if (fieldInput.HelpText is not null) existing.HelpText = fieldInput.HelpText;
 
@@ -438,7 +438,7 @@ public class CollectionMutation
                         DataType = fieldInput.DataType.Value,
                         IsRequired = fieldInput.IsRequired ?? false,
                         IsUnique = fieldInput.IsUnique ?? false,
-                        ValidationRules = fieldInput.ValidationRules,
+                        //ValidationRules = fieldInput.ValidationRules,
                         DefaultValue = fieldInput.DefaultValue,
                         HelpText = fieldInput.HelpText,
                         RelatedCollectionId = fieldInput.DataType.Value == FieldDataType.Relation

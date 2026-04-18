@@ -27,8 +27,8 @@ public class Field
     public required bool IsRequired { get; set; }
     public required bool IsUnique { get; set; }
 
-    [Column(TypeName = "text")]
-    public string? ValidationRules { get; set; }
+   /* [Column(TypeName = "text")]
+    public string? ValidationRules { get; set; } */
 
     [Column(TypeName = "text")]
     public string? DefaultValue { get; set; }

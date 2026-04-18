@@ -576,9 +576,6 @@ namespace TechtonicCmsApi.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
-                    b.Property<string>("ValidationRules")
-                        .HasColumnType("text");
-
                     b.HasKey("Id");
 
                     b.HasIndex("CreatedBy");

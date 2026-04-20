@@ -44,7 +44,7 @@ Program.cs          → Startup, middleware, DI, GraphQL config
     └── Fields/     → Field definitions per collection
 ```
 
-**Startup sequence:** EF Core migrations run automatically → `AdminBootstrapService` seeds admin + 95 ABAC policies → app listens.
+**Startup sequence:** EF Core migrations run automatically → `AdminBootstrapService` seeds admin + 64 ABAC policies → app listens.
 
 ## GraphQL Type Pattern
 
@@ -145,5 +145,5 @@ Filter and sort descriptors are also generated per field — scalar fields use `
 
 - **Session + JWT separation:** Redis stores sessions (15 min TTL) and refresh tokens (7 day TTL). JWTs are stateless RS256 — sessions exist solely for revocation capability.
 - **Password migration:** `PasswordService` transparently upgrades SHA256 → BCrypt on login (legacy accounts upgrade on first successful login).
-- **Admin bootstrap:** `AdminBootstrapService` seeds admin user + 95 default ABAC policies (5 resources × 19 actions) idempotently on startup.
+- **Admin bootstrap:** `AdminBootstrapService` seeds admin user + 64 default ABAC policies (4 resources × 16 active actions) idempotently on startup. `Draft`, `Transform`, and `ConfigureFields` are defined in the enum but excluded from seeding — they have no corresponding mutations.
 - **Multi-locale:** Collections and entries support localization via `Locale` enum (11 languages).

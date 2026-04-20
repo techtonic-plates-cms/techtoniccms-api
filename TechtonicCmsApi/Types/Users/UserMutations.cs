@@ -78,7 +78,6 @@ public class UserMutation
     public async Task<UserEntity> Create(
         CreateUserInput input,
         [Service] TechtonicCmsDbContext db,
-        [Service] AbacService abacService,
         [Service] PasswordService passwordService,
         [Service] IHttpContextAccessor httpContextAccessor)
     {
@@ -103,8 +102,6 @@ public class UserMutation
 
         if (input.RoleIds is { Length: > 0 })
         {
-            await abacService.RequirePermissionAsync(currentUserId, BaseResource.Users, PermissionAction.Update);
-
             foreach (var roleId in input.RoleIds)
             {
                 db.UserRoles.Add(new UserRole
@@ -121,8 +118,6 @@ public class UserMutation
 
         if (input.PolicyIds is { Length: > 0 })
         {
-            await abacService.RequirePermissionAsync(currentUserId, BaseResource.Users, PermissionAction.Update);
-
             foreach (var policyId in input.PolicyIds)
             {
                 db.UserPolicies.Add(new UserPolicy

@@ -70,7 +70,7 @@ public static class AssetEndpoints
                 var allowed = await abacService.CheckPermissionAsync(
                     userId.Value,
                     BaseResource.Assets,
-                    PermissionAction.Read,
+                    PermissionAction.Download,
                     new() { { "OwnerId", asset.UploadedBy } });
 
                 if (!allowed)

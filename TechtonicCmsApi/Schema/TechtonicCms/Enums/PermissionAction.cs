@@ -14,14 +14,11 @@ public enum PermissionAction
     Schedule,
     Archive,
     Restore,
-    Draft,
     Ban,
     Unban,
     Activate,
     Deactivate,
     Upload,
     Download,
-    Transform,
-    ConfigureFields,
     ManageSchema
 }

@@ -78,6 +78,15 @@ public partial class CollectionTypeModule
             collectionMutationsTypeDef.Fields.Add(
                 BuildPublishMutation(collection, entryTypeName));
 
+            collectionMutationsTypeDef.Fields.Add(
+                BuildUnpublishMutation(collection, entryTypeName));
+
+            collectionMutationsTypeDef.Fields.Add(
+                BuildArchiveMutation(collection, entryTypeName));
+
+            collectionMutationsTypeDef.Fields.Add(
+                BuildRestoreMutation(collection, entryTypeName));
+
             types.Add(ObjectType.CreateUnsafe(collectionMutationsTypeDef));
 
             // Wire this collection's mutations into EntriesMutations root
@@ -441,6 +450,154 @@ public partial class CollectionTypeModule
         };
 
         return publishFieldDef;
+    }
+
+    private static ObjectFieldDefinition BuildUnpublishMutation(
+        Collection collection,
+        string entryTypeName)
+    {
+        var collectionId = collection.Id;
+
+        var fieldDef = new ObjectFieldDefinition(
+            "unpublish",
+            $"Revert a published entry to draft in the '{collection.Name}' collection",
+            TypeReference.Parse($"{entryTypeName}!"));
+
+        fieldDef.Arguments.Add(new ArgumentDefinition(
+            "id", "Entry ID to unpublish", TypeReference.Parse("ID!")));
+
+        fieldDef.Resolver = async ctx =>
+        {
+            var db = ctx.Service<TechtonicCmsDbContext>();
+            var abacService = ctx.Service<AbacService>();
+            var httpContextAccessor = ctx.Service<IHttpContextAccessor>();
+
+            var userId = DynamicCollectionHelpers.GetUserId(httpContextAccessor);
+            var entry = await ResolveEntryAsync(ctx, db, collectionId);
+
+            if (entry.Status != EntryStatus.Published)
+                throw new GraphQLException(ErrorBuilder.New()
+                    .SetMessage("Only published entries can be unpublished")
+                    .SetCode("BAD_REQUEST")
+                    .Build());
+
+            await abacService.RequirePermissionAsync(userId, BaseResource.Entries, PermissionAction.Unpublish, new Dictionary<string, object?>
+            {
+                ["ResourceEntryId"]           = entry.Id.ToString(),
+                ["ResourceEntryStatus"]       = entry.Status.ToString(),
+                ["ResourceEntryCreatedBy"]    = entry.CreatedBy.ToString(),
+                ["ResourceEntryCollectionId"] = entry.CollectionId.ToString(),
+                ["ResourceEntryLocale"]       = entry.Locale.ToString(),
+                ["ResourceEntryPublishedAt"]  = entry.PublishedAt?.ToString("O"),
+            });
+
+            entry.Status = EntryStatus.Draft;
+            entry.PublishedAt = null;
+            entry.UpdatedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync();
+
+            return entry;
+        };
+
+        return fieldDef;
+    }
+
+    private static ObjectFieldDefinition BuildArchiveMutation(
+        Collection collection,
+        string entryTypeName)
+    {
+        var collectionId = collection.Id;
+
+        var fieldDef = new ObjectFieldDefinition(
+            "archive",
+            $"Archive an entry in the '{collection.Name}' collection",
+            TypeReference.Parse($"{entryTypeName}!"));
+
+        fieldDef.Arguments.Add(new ArgumentDefinition(
+            "id", "Entry ID to archive", TypeReference.Parse("ID!")));
+
+        fieldDef.Resolver = async ctx =>
+        {
+            var db = ctx.Service<TechtonicCmsDbContext>();
+            var abacService = ctx.Service<AbacService>();
+            var httpContextAccessor = ctx.Service<IHttpContextAccessor>();
+
+            var userId = DynamicCollectionHelpers.GetUserId(httpContextAccessor);
+            var entry = await ResolveEntryAsync(ctx, db, collectionId);
+
+            if (entry.Status == EntryStatus.Deleted)
+                throw new GraphQLException(ErrorBuilder.New()
+                    .SetMessage("Deleted entries cannot be archived")
+                    .SetCode("BAD_REQUEST")
+                    .Build());
+
+            await abacService.RequirePermissionAsync(userId, BaseResource.Entries, PermissionAction.Archive, new Dictionary<string, object?>
+            {
+                ["ResourceEntryId"]           = entry.Id.ToString(),
+                ["ResourceEntryStatus"]       = entry.Status.ToString(),
+                ["ResourceEntryCreatedBy"]    = entry.CreatedBy.ToString(),
+                ["ResourceEntryCollectionId"] = entry.CollectionId.ToString(),
+                ["ResourceEntryLocale"]       = entry.Locale.ToString(),
+                ["ResourceEntryPublishedAt"]  = entry.PublishedAt?.ToString("O"),
+            });
+
+            entry.Status = EntryStatus.Archived;
+            entry.UpdatedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync();
+
+            return entry;
+        };
+
+        return fieldDef;
+    }
+
+    private static ObjectFieldDefinition BuildRestoreMutation(
+        Collection collection,
+        string entryTypeName)
+    {
+        var collectionId = collection.Id;
+
+        var fieldDef = new ObjectFieldDefinition(
+            "restore",
+            $"Restore an archived or deleted entry to draft in the '{collection.Name}' collection",
+            TypeReference.Parse($"{entryTypeName}!"));
+
+        fieldDef.Arguments.Add(new ArgumentDefinition(
+            "id", "Entry ID to restore", TypeReference.Parse("ID!")));
+
+        fieldDef.Resolver = async ctx =>
+        {
+            var db = ctx.Service<TechtonicCmsDbContext>();
+            var abacService = ctx.Service<AbacService>();
+            var httpContextAccessor = ctx.Service<IHttpContextAccessor>();
+
+            var userId = DynamicCollectionHelpers.GetUserId(httpContextAccessor);
+            var entry = await ResolveEntryAsync(ctx, db, collectionId);
+
+            if (entry.Status != EntryStatus.Archived && entry.Status != EntryStatus.Deleted)
+                throw new GraphQLException(ErrorBuilder.New()
+                    .SetMessage("Only archived or deleted entries can be restored")
+                    .SetCode("BAD_REQUEST")
+                    .Build());
+
+            await abacService.RequirePermissionAsync(userId, BaseResource.Entries, PermissionAction.Restore, new Dictionary<string, object?>
+            {
+                ["ResourceEntryId"]           = entry.Id.ToString(),
+                ["ResourceEntryStatus"]       = entry.Status.ToString(),
+                ["ResourceEntryCreatedBy"]    = entry.CreatedBy.ToString(),
+                ["ResourceEntryCollectionId"] = entry.CollectionId.ToString(),
+                ["ResourceEntryLocale"]       = entry.Locale.ToString(),
+                ["ResourceEntryPublishedAt"]  = entry.PublishedAt?.ToString("O"),
+            });
+
+            entry.Status = EntryStatus.Draft;
+            entry.UpdatedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync();
+
+            return entry;
+        };
+
+        return fieldDef;
     }
 
     // ──────────────────────────────────────────────────────────────────

@@ -22,7 +22,7 @@ public class TechtonicCmsDbContext : DbContext
     public DbSet<Field> Fields => Set<Field>();
     public DbSet<Entry> Entries => Set<Entry>();
     public DbSet<EntryRelation> EntryRelations => Set<EntryRelation>();
-
+    public DbSet<EntrySchedules> EntrySchedules => Set<EntrySchedules>();
     public DbSet<Asset> Assets => Set<Asset>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

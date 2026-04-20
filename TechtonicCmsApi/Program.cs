@@ -72,6 +72,8 @@ builder.Services.AddAuthorization(options =>
 
 builder.Services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, AbacAuthorizationHandler>();
 
+builder.Services.AddHostedService<SchedulerService>();
+
 builder.Services.AddHttpContextAccessor();
 
 builder.AddGraphQL()

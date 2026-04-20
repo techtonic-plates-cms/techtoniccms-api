@@ -2,11 +2,10 @@ using Microsoft.EntityFrameworkCore;
 using TechtonicCmsApi.Contexts;
 using TechtonicCmsApi.Schema.TechtonicCms.Enums;
 
-public class SchedulerService : IHostedService, IDisposable
+public class SchedulerService : BackgroundService
 {
     private readonly ILogger<SchedulerService> _logger;
     private readonly IDbContextFactory<TechtonicCmsDbContext> _dbContextFactory;
-
 
     public SchedulerService(ILogger<SchedulerService> logger, IDbContextFactory<TechtonicCmsDbContext> dbContextFactory)
     {
@@ -14,17 +13,18 @@ public class SchedulerService : IHostedService, IDisposable
         _dbContextFactory = dbContextFactory;
     }
 
-    public async Task StartAsync(CancellationToken cancellationToken)
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
-
-        while (!cancellationToken.IsCancellationRequested)
+        while (!stoppingToken.IsCancellationRequested)
         {
-            var scheduledItems = from se in dbContext.EntrySchedules
+            await using var dbContext = await _dbContextFactory.CreateDbContextAsync(stoppingToken);
+
+            var scheduledItems = await (
+                from se in dbContext.EntrySchedules
                 where se.ScheduledTime <= DateTime.UtcNow && !se.AlreadyExecuted
                 join e in dbContext.Entries on se.EntryId equals e.Id
-                select new { Schedule = se, Entry = e };
-
+                select new { Schedule = se, Entry = e }
+            ).ToListAsync(stoppingToken);
 
             foreach (var item in scheduledItems)
             {
@@ -55,24 +55,10 @@ public class SchedulerService : IHostedService, IDisposable
                 dbContext.EntrySchedules.Update(item.Schedule);
                 dbContext.Entries.Update(item.Entry);
 
-                await dbContext.SaveChangesAsync();
+                await dbContext.SaveChangesAsync(stoppingToken);
             }
 
-            await Task.Delay(TimeSpan.FromMinutes(1), cancellationToken);
+            await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
         }
-
-        
     }
-
-    public Task StopAsync(CancellationToken cancellationToken)
-    {
-        return Task.CompletedTask;
-    }
-
-
-    public void Dispose()
-    {
-        
-    }
-
 }

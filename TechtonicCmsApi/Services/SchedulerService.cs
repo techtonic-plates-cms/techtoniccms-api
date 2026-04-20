@@ -22,13 +22,34 @@ public class SchedulerService : IHostedService, IDisposable
         {
             var scheduledItems = from se in dbContext.EntrySchedules
                 where se.ScheduledTime <= DateTime.UtcNow && !se.AlreadyExecuted
-                join e in dbContext.Entries on se.Entry.Id equals e.Id
+                join e in dbContext.Entries on se.EntryId equals e.Id
                 select new { Schedule = se, Entry = e };
 
 
             foreach (var item in scheduledItems)
             {
-                item.Entry.Status = EntryStatus.Published;
+                switch (item.Schedule.Action)
+                {
+                    case ScheduledAction.Publish:
+                        item.Entry.Status = EntryStatus.Published;
+                        item.Entry.PublishedAt ??= item.Schedule.ScheduledTime;
+                        break;
+                    case ScheduledAction.Unpublish:
+                        item.Entry.Status = EntryStatus.Draft;
+                        item.Entry.PublishedAt = null;
+                        break;
+                    case ScheduledAction.Archive:
+                        item.Entry.Status = EntryStatus.Archived;
+                        break;
+                    case ScheduledAction.Restore:
+                        item.Entry.Status = EntryStatus.Draft;
+                        break;
+                    case ScheduledAction.Delete:
+                        item.Entry.Status = EntryStatus.Deleted;
+                        break;
+                }
+
+                item.Entry.UpdatedAt = DateTime.UtcNow;
                 item.Schedule.AlreadyExecuted = true;
 
                 dbContext.EntrySchedules.Update(item.Schedule);

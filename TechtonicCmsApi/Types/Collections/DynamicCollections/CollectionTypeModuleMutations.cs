@@ -149,6 +149,10 @@ public partial class CollectionTypeModule
             "data", $"Dynamic data for the '{collection.Name}' collection",
             TypeReference.Parse($"{createDataInputTypeName}!")));
 
+        createFieldDef.Arguments.Add(new ArgumentDefinition(
+            "schedulePublishFor", "Schedule this entry to be published at the given UTC time",
+            TypeReference.Parse("DateTime")));
+
         createFieldDef.Resolver = async ctx =>
         {
             var mutationDb = ctx.Service<TechtonicCmsDbContext>();
@@ -226,6 +230,22 @@ public partial class CollectionTypeModule
 
             await mutationDb.SaveChangesAsync();
 
+            var schedulePublishFor = ctx.ArgumentValue<DateTime?>("schedulePublishFor");
+            if (schedulePublishFor.HasValue && entry.Status != EntryStatus.Published)
+            {
+                await abacService.RequirePermissionAsync(userId, BaseResource.Entries, PermissionAction.Schedule, new Dictionary<string, object?>
+                {
+                    ["ResourceEntryId"]           = entry.Id.ToString(),
+                    ["ResourceEntryStatus"]       = entry.Status.ToString(),
+                    ["ResourceEntryCreatedBy"]    = entry.CreatedBy.ToString(),
+                    ["ResourceEntryCollectionId"] = entry.CollectionId.ToString(),
+                    ["ResourceEntryLocale"]       = entry.Locale.ToString(),
+                    ["ResourceEntryPublishedAt"]  = entry.PublishedAt?.ToString("O"),
+                });
+                mutationDb.EntrySchedules.Add(BuildSchedule(entry.Id, entry, ScheduledAction.Publish, schedulePublishFor.Value));
+                await mutationDb.SaveChangesAsync();
+            }
+
             return entry;
         };
 
@@ -266,6 +286,10 @@ public partial class CollectionTypeModule
         updateFieldDef.Arguments.Add(new ArgumentDefinition(
             "data", $"Dynamic data for the '{collection.Name}' collection (partial update)",
             TypeReference.Parse(updateDataInputTypeName)));
+
+        updateFieldDef.Arguments.Add(new ArgumentDefinition(
+            "schedulePublishFor", "Schedule this entry to be published at the given UTC time (replaces any existing pending publish schedule)",
+            TypeReference.Parse("DateTime")));
 
         updateFieldDef.Resolver = async ctx =>
         {
@@ -349,6 +373,23 @@ public partial class CollectionTypeModule
             entry.UpdatedAt = DateTime.UtcNow;
             await mutationDb.SaveChangesAsync();
 
+            var schedulePublishFor = ctx.ArgumentOptional<DateTime?>("schedulePublishFor");
+            if (schedulePublishFor.HasValue && schedulePublishFor.Value.HasValue)
+            {
+                await abacService.RequirePermissionAsync(userId, BaseResource.Entries, PermissionAction.Schedule, new Dictionary<string, object?>
+                {
+                    ["ResourceEntryId"]           = entry.Id.ToString(),
+                    ["ResourceEntryStatus"]       = entry.Status.ToString(),
+                    ["ResourceEntryCreatedBy"]    = entry.CreatedBy.ToString(),
+                    ["ResourceEntryCollectionId"] = entry.CollectionId.ToString(),
+                    ["ResourceEntryLocale"]       = entry.Locale.ToString(),
+                    ["ResourceEntryPublishedAt"]  = entry.PublishedAt?.ToString("O"),
+                });
+                await CancelPendingScheduleAsync(mutationDb, entry.Id, ScheduledAction.Publish);
+                mutationDb.EntrySchedules.Add(BuildSchedule(entry.Id, entry, ScheduledAction.Publish, schedulePublishFor.Value.Value));
+                await mutationDb.SaveChangesAsync();
+            }
+
             return entry;
         };
 
@@ -373,6 +414,10 @@ public partial class CollectionTypeModule
         deleteFieldDef.Arguments.Add(new ArgumentDefinition(
             "id", "Entry ID to delete", TypeReference.Parse("ID!")));
 
+        deleteFieldDef.Arguments.Add(new ArgumentDefinition(
+            "scheduleFor", "Schedule the deletion at this UTC time instead of deleting immediately",
+            TypeReference.Parse("DateTime")));
+
         deleteFieldDef.Resolver = async ctx =>
         {
             var mutationDb = ctx.Service<TechtonicCmsDbContext>();
@@ -383,19 +428,32 @@ public partial class CollectionTypeModule
 
             var entry = await ResolveEntryAsync(ctx, mutationDb, collectionId);
 
-            await abacService.RequirePermissionAsync(userId, BaseResource.Entries, PermissionAction.Delete, new Dictionary<string, object?>
-            {
-                ["ResourceEntryId"] = entry.Id.ToString(),
-                ["ResourceEntryStatus"] = entry.Status.ToString(),
-                ["ResourceEntryCreatedBy"] = entry.CreatedBy.ToString(),
-                ["ResourceEntryCollectionId"] = entry.CollectionId.ToString(),
-                ["ResourceEntryLocale"] = entry.Locale.ToString(),
-                ["ResourceEntryPublishedAt"] = entry.PublishedAt?.ToString("O"),
-            });
+            var scheduleFor = ctx.ArgumentValue<DateTime?>("scheduleFor");
 
-            entry.Status = EntryStatus.Deleted;
-            entry.UpdatedAt = DateTime.UtcNow;
-            await mutationDb.SaveChangesAsync();
+            var abacContext = new Dictionary<string, object?>
+            {
+                ["ResourceEntryId"]           = entry.Id.ToString(),
+                ["ResourceEntryStatus"]       = entry.Status.ToString(),
+                ["ResourceEntryCreatedBy"]    = entry.CreatedBy.ToString(),
+                ["ResourceEntryCollectionId"] = entry.CollectionId.ToString(),
+                ["ResourceEntryLocale"]       = entry.Locale.ToString(),
+                ["ResourceEntryPublishedAt"]  = entry.PublishedAt?.ToString("O"),
+            };
+
+            if (scheduleFor.HasValue)
+            {
+                await abacService.RequirePermissionAsync(userId, BaseResource.Entries, PermissionAction.Schedule, abacContext);
+                await CancelPendingScheduleAsync(mutationDb, entry.Id, ScheduledAction.Delete);
+                mutationDb.EntrySchedules.Add(BuildSchedule(entry.Id, entry, ScheduledAction.Delete, scheduleFor.Value));
+                await mutationDb.SaveChangesAsync();
+            }
+            else
+            {
+                await abacService.RequirePermissionAsync(userId, BaseResource.Entries, PermissionAction.Delete, abacContext);
+                entry.Status = EntryStatus.Deleted;
+                entry.UpdatedAt = DateTime.UtcNow;
+                await mutationDb.SaveChangesAsync();
+            }
 
             return entry;
         };
@@ -421,6 +479,10 @@ public partial class CollectionTypeModule
         publishFieldDef.Arguments.Add(new ArgumentDefinition(
             "id", "Entry ID to publish", TypeReference.Parse("ID!")));
 
+        publishFieldDef.Arguments.Add(new ArgumentDefinition(
+            "scheduleFor", "Schedule publishing at this UTC time instead of publishing immediately",
+            TypeReference.Parse("DateTime")));
+
         publishFieldDef.Resolver = async ctx =>
         {
             var mutationDb = ctx.Service<TechtonicCmsDbContext>();
@@ -431,20 +493,34 @@ public partial class CollectionTypeModule
 
             var entry = await ResolveEntryAsync(ctx, mutationDb, collectionId);
 
-            await abacService.RequirePermissionAsync(userId, BaseResource.Entries, PermissionAction.Publish, new Dictionary<string, object?>
-            {
-                ["ResourceEntryId"] = entry.Id.ToString(),
-                ["ResourceEntryStatus"] = entry.Status.ToString(),
-                ["ResourceEntryCreatedBy"] = entry.CreatedBy.ToString(),
-                ["ResourceEntryCollectionId"] = entry.CollectionId.ToString(),
-                ["ResourceEntryLocale"] = entry.Locale.ToString(),
-                ["ResourceEntryPublishedAt"] = entry.PublishedAt?.ToString("O"),
-            });
+            var scheduleFor = ctx.ArgumentValue<DateTime?>("scheduleFor");
 
-            entry.Status = EntryStatus.Published;
-            entry.PublishedAt = DateTime.UtcNow;
-            entry.UpdatedAt = DateTime.UtcNow;
-            await mutationDb.SaveChangesAsync();
+            var abacContext = new Dictionary<string, object?>
+            {
+                ["ResourceEntryId"]           = entry.Id.ToString(),
+                ["ResourceEntryStatus"]       = entry.Status.ToString(),
+                ["ResourceEntryCreatedBy"]    = entry.CreatedBy.ToString(),
+                ["ResourceEntryCollectionId"] = entry.CollectionId.ToString(),
+                ["ResourceEntryLocale"]       = entry.Locale.ToString(),
+                ["ResourceEntryPublishedAt"]  = entry.PublishedAt?.ToString("O"),
+            };
+
+            if (scheduleFor.HasValue)
+            {
+                await abacService.RequirePermissionAsync(userId, BaseResource.Entries, PermissionAction.Schedule, abacContext);
+                await CancelPendingScheduleAsync(mutationDb, entry.Id, ScheduledAction.Publish);
+                mutationDb.EntrySchedules.Add(BuildSchedule(entry.Id, entry, ScheduledAction.Publish, scheduleFor.Value));
+                await mutationDb.SaveChangesAsync();
+            }
+            else
+            {
+                await abacService.RequirePermissionAsync(userId, BaseResource.Entries, PermissionAction.Publish, abacContext);
+                await CancelPendingScheduleAsync(mutationDb, entry.Id, ScheduledAction.Publish);
+                entry.Status = EntryStatus.Published;
+                entry.PublishedAt = DateTime.UtcNow;
+                entry.UpdatedAt = DateTime.UtcNow;
+                await mutationDb.SaveChangesAsync();
+            }
 
             return entry;
         };
@@ -466,6 +542,10 @@ public partial class CollectionTypeModule
         fieldDef.Arguments.Add(new ArgumentDefinition(
             "id", "Entry ID to unpublish", TypeReference.Parse("ID!")));
 
+        fieldDef.Arguments.Add(new ArgumentDefinition(
+            "scheduleFor", "Schedule unpublishing at this UTC time instead of unpublishing immediately",
+            TypeReference.Parse("DateTime")));
+
         fieldDef.Resolver = async ctx =>
         {
             var db = ctx.Service<TechtonicCmsDbContext>();
@@ -475,13 +555,9 @@ public partial class CollectionTypeModule
             var userId = DynamicCollectionHelpers.GetUserId(httpContextAccessor);
             var entry = await ResolveEntryAsync(ctx, db, collectionId);
 
-            if (entry.Status != EntryStatus.Published)
-                throw new GraphQLException(ErrorBuilder.New()
-                    .SetMessage("Only published entries can be unpublished")
-                    .SetCode("BAD_REQUEST")
-                    .Build());
+            var scheduleFor = ctx.ArgumentValue<DateTime?>("scheduleFor");
 
-            await abacService.RequirePermissionAsync(userId, BaseResource.Entries, PermissionAction.Unpublish, new Dictionary<string, object?>
+            var abacContext = new Dictionary<string, object?>
             {
                 ["ResourceEntryId"]           = entry.Id.ToString(),
                 ["ResourceEntryStatus"]       = entry.Status.ToString(),
@@ -489,12 +565,30 @@ public partial class CollectionTypeModule
                 ["ResourceEntryCollectionId"] = entry.CollectionId.ToString(),
                 ["ResourceEntryLocale"]       = entry.Locale.ToString(),
                 ["ResourceEntryPublishedAt"]  = entry.PublishedAt?.ToString("O"),
-            });
+            };
 
-            entry.Status = EntryStatus.Draft;
-            entry.PublishedAt = null;
-            entry.UpdatedAt = DateTime.UtcNow;
-            await db.SaveChangesAsync();
+            if (scheduleFor.HasValue)
+            {
+                await abacService.RequirePermissionAsync(userId, BaseResource.Entries, PermissionAction.Schedule, abacContext);
+                await CancelPendingScheduleAsync(db, entry.Id, ScheduledAction.Unpublish);
+                db.EntrySchedules.Add(BuildSchedule(entry.Id, entry, ScheduledAction.Unpublish, scheduleFor.Value));
+                await db.SaveChangesAsync();
+            }
+            else
+            {
+                if (entry.Status != EntryStatus.Published)
+                    throw new GraphQLException(ErrorBuilder.New()
+                        .SetMessage("Only published entries can be unpublished")
+                        .SetCode("BAD_REQUEST")
+                        .Build());
+
+                await abacService.RequirePermissionAsync(userId, BaseResource.Entries, PermissionAction.Unpublish, abacContext);
+                await CancelPendingScheduleAsync(db, entry.Id, ScheduledAction.Unpublish);
+                entry.Status = EntryStatus.Draft;
+                entry.PublishedAt = null;
+                entry.UpdatedAt = DateTime.UtcNow;
+                await db.SaveChangesAsync();
+            }
 
             return entry;
         };
@@ -516,6 +610,10 @@ public partial class CollectionTypeModule
         fieldDef.Arguments.Add(new ArgumentDefinition(
             "id", "Entry ID to archive", TypeReference.Parse("ID!")));
 
+        fieldDef.Arguments.Add(new ArgumentDefinition(
+            "scheduleFor", "Schedule archiving at this UTC time instead of archiving immediately",
+            TypeReference.Parse("DateTime")));
+
         fieldDef.Resolver = async ctx =>
         {
             var db = ctx.Service<TechtonicCmsDbContext>();
@@ -525,13 +623,9 @@ public partial class CollectionTypeModule
             var userId = DynamicCollectionHelpers.GetUserId(httpContextAccessor);
             var entry = await ResolveEntryAsync(ctx, db, collectionId);
 
-            if (entry.Status == EntryStatus.Deleted)
-                throw new GraphQLException(ErrorBuilder.New()
-                    .SetMessage("Deleted entries cannot be archived")
-                    .SetCode("BAD_REQUEST")
-                    .Build());
+            var scheduleFor = ctx.ArgumentValue<DateTime?>("scheduleFor");
 
-            await abacService.RequirePermissionAsync(userId, BaseResource.Entries, PermissionAction.Archive, new Dictionary<string, object?>
+            var abacContext = new Dictionary<string, object?>
             {
                 ["ResourceEntryId"]           = entry.Id.ToString(),
                 ["ResourceEntryStatus"]       = entry.Status.ToString(),
@@ -539,11 +633,29 @@ public partial class CollectionTypeModule
                 ["ResourceEntryCollectionId"] = entry.CollectionId.ToString(),
                 ["ResourceEntryLocale"]       = entry.Locale.ToString(),
                 ["ResourceEntryPublishedAt"]  = entry.PublishedAt?.ToString("O"),
-            });
+            };
 
-            entry.Status = EntryStatus.Archived;
-            entry.UpdatedAt = DateTime.UtcNow;
-            await db.SaveChangesAsync();
+            if (scheduleFor.HasValue)
+            {
+                await abacService.RequirePermissionAsync(userId, BaseResource.Entries, PermissionAction.Schedule, abacContext);
+                await CancelPendingScheduleAsync(db, entry.Id, ScheduledAction.Archive);
+                db.EntrySchedules.Add(BuildSchedule(entry.Id, entry, ScheduledAction.Archive, scheduleFor.Value));
+                await db.SaveChangesAsync();
+            }
+            else
+            {
+                if (entry.Status == EntryStatus.Deleted)
+                    throw new GraphQLException(ErrorBuilder.New()
+                        .SetMessage("Deleted entries cannot be archived")
+                        .SetCode("BAD_REQUEST")
+                        .Build());
+
+                await abacService.RequirePermissionAsync(userId, BaseResource.Entries, PermissionAction.Archive, abacContext);
+                await CancelPendingScheduleAsync(db, entry.Id, ScheduledAction.Archive);
+                entry.Status = EntryStatus.Archived;
+                entry.UpdatedAt = DateTime.UtcNow;
+                await db.SaveChangesAsync();
+            }
 
             return entry;
         };
@@ -565,6 +677,10 @@ public partial class CollectionTypeModule
         fieldDef.Arguments.Add(new ArgumentDefinition(
             "id", "Entry ID to restore", TypeReference.Parse("ID!")));
 
+        fieldDef.Arguments.Add(new ArgumentDefinition(
+            "scheduleFor", "Schedule restoration at this UTC time instead of restoring immediately",
+            TypeReference.Parse("DateTime")));
+
         fieldDef.Resolver = async ctx =>
         {
             var db = ctx.Service<TechtonicCmsDbContext>();
@@ -574,13 +690,9 @@ public partial class CollectionTypeModule
             var userId = DynamicCollectionHelpers.GetUserId(httpContextAccessor);
             var entry = await ResolveEntryAsync(ctx, db, collectionId);
 
-            if (entry.Status != EntryStatus.Archived && entry.Status != EntryStatus.Deleted)
-                throw new GraphQLException(ErrorBuilder.New()
-                    .SetMessage("Only archived or deleted entries can be restored")
-                    .SetCode("BAD_REQUEST")
-                    .Build());
+            var scheduleFor = ctx.ArgumentValue<DateTime?>("scheduleFor");
 
-            await abacService.RequirePermissionAsync(userId, BaseResource.Entries, PermissionAction.Restore, new Dictionary<string, object?>
+            var abacContext = new Dictionary<string, object?>
             {
                 ["ResourceEntryId"]           = entry.Id.ToString(),
                 ["ResourceEntryStatus"]       = entry.Status.ToString(),
@@ -588,11 +700,29 @@ public partial class CollectionTypeModule
                 ["ResourceEntryCollectionId"] = entry.CollectionId.ToString(),
                 ["ResourceEntryLocale"]       = entry.Locale.ToString(),
                 ["ResourceEntryPublishedAt"]  = entry.PublishedAt?.ToString("O"),
-            });
+            };
 
-            entry.Status = EntryStatus.Draft;
-            entry.UpdatedAt = DateTime.UtcNow;
-            await db.SaveChangesAsync();
+            if (scheduleFor.HasValue)
+            {
+                await abacService.RequirePermissionAsync(userId, BaseResource.Entries, PermissionAction.Schedule, abacContext);
+                await CancelPendingScheduleAsync(db, entry.Id, ScheduledAction.Restore);
+                db.EntrySchedules.Add(BuildSchedule(entry.Id, entry, ScheduledAction.Restore, scheduleFor.Value));
+                await db.SaveChangesAsync();
+            }
+            else
+            {
+                if (entry.Status != EntryStatus.Archived && entry.Status != EntryStatus.Deleted)
+                    throw new GraphQLException(ErrorBuilder.New()
+                        .SetMessage("Only archived or deleted entries can be restored")
+                        .SetCode("BAD_REQUEST")
+                        .Build());
+
+                await abacService.RequirePermissionAsync(userId, BaseResource.Entries, PermissionAction.Restore, abacContext);
+                await CancelPendingScheduleAsync(db, entry.Id, ScheduledAction.Restore);
+                entry.Status = EntryStatus.Draft;
+                entry.UpdatedAt = DateTime.UtcNow;
+                await db.SaveChangesAsync();
+            }
 
             return entry;
         };
@@ -603,6 +733,26 @@ public partial class CollectionTypeModule
     // ──────────────────────────────────────────────────────────────────
     // Mutation Helper Methods
     // ──────────────────────────────────────────────────────────────────
+
+    private static async Task CancelPendingScheduleAsync(
+        TechtonicCmsDbContext db, Guid entryId, ScheduledAction action)
+    {
+        var pending = await db.EntrySchedules
+            .Where(s => s.EntryId == entryId && s.Action == action && !s.AlreadyExecuted)
+            .ToListAsync();
+        db.EntrySchedules.RemoveRange(pending);
+    }
+
+    private static EntrySchedules BuildSchedule(Guid entryId, Entry entry, ScheduledAction action, DateTime scheduledFor) =>
+        new()
+        {
+            Id = Guid.NewGuid(),
+            EntryId = entryId,
+            Entry = entry,
+            Action = action,
+            ScheduledTime = scheduledFor,
+            AlreadyExecuted = false
+        };
 
     /// <summary>
     /// Resolves an entry by the <c>id</c> argument, throwing standard errors if not found.

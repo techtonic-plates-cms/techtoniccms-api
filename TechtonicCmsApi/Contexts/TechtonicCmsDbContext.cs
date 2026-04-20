@@ -42,6 +42,7 @@ public class TechtonicCmsDbContext : DbContext
         ConfigureField(modelBuilder);
         ConfigureEntry(modelBuilder);
         ConfigureEntryRelation(modelBuilder);
+        ConfigureEntrySchedules(modelBuilder);
         ConfigureAsset(modelBuilder);
     }
 
@@ -58,6 +59,7 @@ public class TechtonicCmsDbContext : DbContext
         modelBuilder.HasPostgresEnum<EntryStatus>();
         modelBuilder.HasPostgresEnum<Locale>();
         modelBuilder.HasPostgresEnum<FieldDataType>();
+        modelBuilder.HasPostgresEnum<ScheduledAction>();
     }
 
     private static void ConfigureUser(ModelBuilder modelBuilder)
@@ -260,6 +262,21 @@ public class TechtonicCmsDbContext : DbContext
 
   
 
+
+    private static void ConfigureEntrySchedules(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<EntrySchedules>(e =>
+        {
+            e.Property(s => s.Id).HasDefaultValueSql("gen_random_uuid()");
+            e.Property(s => s.Action).HasDefaultValue(ScheduledAction.Publish);
+            e.Property(s => s.AlreadyExecuted).HasDefaultValue(false);
+
+            e.HasOne(s => s.Entry)
+                .WithMany()
+                .HasForeignKey(s => s.EntryId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+    }
 
     private static void ConfigureEntryRelation(ModelBuilder modelBuilder)
     {

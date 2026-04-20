@@ -13,8 +13,8 @@ using TechtonicCmsApi.Contexts;
 namespace TechtonicCmsApi.Migrations
 {
     [DbContext(typeof(TechtonicCmsDbContext))]
-    [Migration("20260420150847_AddedEntrySchedulesTable")]
-    partial class AddedEntrySchedulesTable
+    [Migration("20260420171522_InitialMigration")]
+    partial class InitialMigration
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -31,7 +31,7 @@ namespace TechtonicCmsApi.Migrations
             NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "locale", new[] { "en", "es", "fr", "de", "it", "pt", "ja", "ko", "zh", "ar", "ru" });
             NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "logical_operator", new[] { "and", "or" });
             NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "operator_type", new[] { "eq", "ne", "in", "not_in", "gt", "gte", "lt", "lte", "contains", "starts_with", "ends_with", "is_null", "is_not_null", "regex", "eq_context_ref" });
-            NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "permission_action", new[] { "create", "read", "update", "delete", "publish", "unpublish", "schedule", "archive", "restore", "draft", "ban", "unban", "activate", "deactivate", "upload", "download", "transform", "configure_fields", "manage_schema" });
+            NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "permission_action", new[] { "create", "read", "update", "delete", "publish", "unpublish", "schedule", "archive", "restore", "ban", "unban", "activate", "deactivate", "upload", "download", "manage_schema" });
             NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "permission_effect", new[] { "allow", "deny" });
             NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "user_status", new[] { "active", "inactive", "banned" });
             NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "value_type", new[] { "string", "number", "boolean", "uuid", "datetime", "array" });

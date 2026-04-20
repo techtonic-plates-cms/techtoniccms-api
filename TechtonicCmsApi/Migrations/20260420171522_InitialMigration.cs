@@ -19,8 +19,8 @@ namespace TechtonicCmsApi.Migrations
                 .Annotation("Npgsql:Enum:field_data_type", "text,boolean,number,date_time,relation,asset,object")
                 .Annotation("Npgsql:Enum:locale", "en,es,fr,de,it,pt,ja,ko,zh,ar,ru")
                 .Annotation("Npgsql:Enum:logical_operator", "and,or")
-                .Annotation("Npgsql:Enum:operator_type", "eq,ne,in,not_in,gt,gte,lt,lte,contains,starts_with,ends_with,is_null,is_not_null,regex")
-                .Annotation("Npgsql:Enum:permission_action", "create,read,update,delete,publish,unpublish,schedule,archive,restore,draft,ban,unban,activate,deactivate,upload,download,transform,configure_fields,manage_schema")
+                .Annotation("Npgsql:Enum:operator_type", "eq,ne,in,not_in,gt,gte,lt,lte,contains,starts_with,ends_with,is_null,is_not_null,regex,eq_context_ref")
+                .Annotation("Npgsql:Enum:permission_action", "create,read,update,delete,publish,unpublish,schedule,archive,restore,ban,unban,activate,deactivate,upload,download,manage_schema")
                 .Annotation("Npgsql:Enum:permission_effect", "allow,deny")
                 .Annotation("Npgsql:Enum:user_status", "active,inactive,banned")
                 .Annotation("Npgsql:Enum:value_type", "string,number,boolean,uuid,datetime,array");
@@ -381,6 +381,26 @@ namespace TechtonicCmsApi.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "entry_schedules",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    EntryId = table.Column<Guid>(type: "uuid", nullable: false),
+                    ScheduledTime = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    AlreadyExecuted = table.Column<bool>(type: "boolean", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_entry_schedules", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_entry_schedules_entries_EntryId",
+                        column: x => x.EntryId,
+                        principalTable: "entries",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "abac_audit",
                 columns: table => new
                 {
@@ -638,6 +658,11 @@ namespace TechtonicCmsApi.Migrations
                 column: "TargetEntryId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_entry_schedules_EntryId",
+                table: "entry_schedules",
+                column: "EntryId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_fields_CollectionId_Name",
                 table: "fields",
                 columns: new[] { "CollectionId", "Name" },
@@ -780,6 +805,9 @@ namespace TechtonicCmsApi.Migrations
                 name: "entry_relations");
 
             migrationBuilder.DropTable(
+                name: "entry_schedules");
+
+            migrationBuilder.DropTable(
                 name: "resource_ownerships");
 
             migrationBuilder.DropTable(
@@ -792,10 +820,10 @@ namespace TechtonicCmsApi.Migrations
                 name: "user_roles");
 
             migrationBuilder.DropTable(
-                name: "entries");
+                name: "fields");
 
             migrationBuilder.DropTable(
-                name: "fields");
+                name: "entries");
 
             migrationBuilder.DropTable(
                 name: "abac_policies");

@@ -24,6 +24,8 @@ public class CreateUserInput
     public UserStatus? Status { get; set; }
 
     public Guid[]? RoleIds { get; set; }
+
+    public Guid[]? PolicyIds { get; set; }
 }
 
 public class UpdateUserInput
@@ -55,6 +57,19 @@ public class AssignRoleInput
     public Guid RoleId { get; set; }
 
     public string? ExpiresAt { get; set; }
+}
+
+public class AssignPolicyToUserInput
+{
+    [GraphQLType<NonNullType<IdType>>]
+    public Guid UserId { get; set; }
+
+    [GraphQLType<NonNullType<IdType>>]
+    public Guid PolicyId { get; set; }
+
+    public string? ExpiresAt { get; set; }
+
+    public string? Reason { get; set; }
 }
 
 public class UserMutation
@@ -97,6 +112,25 @@ public class UserMutation
                     Id = Guid.NewGuid(),
                     UserId = user.Id,
                     RoleId = roleId,
+                    AssignedAt = DateTime.UtcNow
+                });
+            }
+
+            await db.SaveChangesAsync();
+        }
+
+        if (input.PolicyIds is { Length: > 0 })
+        {
+            await abacService.RequirePermissionAsync(currentUserId, BaseResource.Users, PermissionAction.Update);
+
+            foreach (var policyId in input.PolicyIds)
+            {
+                db.UserPolicies.Add(new UserPolicy
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = user.Id,
+                    PolicyId = policyId,
+                    AssignedBy = currentUserId,
                     AssignedAt = DateTime.UtcNow
                 });
             }
@@ -292,6 +326,80 @@ public class UserMutation
         if (userRole is not null)
         {
             db.UserRoles.Remove(userRole);
+            await db.SaveChangesAsync();
+        }
+
+        return true;
+    }
+
+    [Authorize("Users:Update")]
+    public async Task<bool> AssignPolicy(
+        AssignPolicyToUserInput input,
+        [Service] TechtonicCmsDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var currentUserId = GetUserId(httpContextAccessor);
+
+        var user = await db.Users.FindAsync(input.UserId);
+        if (user is null)
+        {
+            throw new GraphQLException(ErrorBuilder.New()
+                .SetMessage("User not found")
+                .SetCode("NOT_FOUND")
+                .Build());
+        }
+
+        var policy = await db.AbacPolicies.FindAsync(input.PolicyId);
+        if (policy is null)
+        {
+            throw new GraphQLException(ErrorBuilder.New()
+                .SetMessage("Policy not found")
+                .SetCode("NOT_FOUND")
+                .Build());
+        }
+
+        var existing = await db.UserPolicies
+            .AnyAsync(up => up.UserId == input.UserId && up.PolicyId == input.PolicyId);
+
+        if (existing)
+        {
+            throw new GraphQLException(ErrorBuilder.New()
+                .SetMessage("Policy already assigned to user")
+                .SetCode("CONFLICT")
+                .Build());
+        }
+
+        var userPolicy = new UserPolicy
+        {
+            Id = Guid.NewGuid(),
+            UserId = input.UserId,
+            PolicyId = input.PolicyId,
+            AssignedBy = currentUserId,
+            AssignedAt = DateTime.UtcNow,
+            ExpiresAt = input.ExpiresAt is not null
+                ? DateTime.Parse(input.ExpiresAt, null, System.Globalization.DateTimeStyles.RoundtripKind)
+                : null,
+            Reason = input.Reason
+        };
+
+        db.UserPolicies.Add(userPolicy);
+        await db.SaveChangesAsync();
+
+        return true;
+    }
+
+    [Authorize("Users:Update")]
+    public async Task<bool> UnassignPolicy(
+        Guid userId,
+        Guid policyId,
+        [Service] TechtonicCmsDbContext db)
+    {
+        var userPolicy = await db.UserPolicies
+            .FirstOrDefaultAsync(up => up.UserId == userId && up.PolicyId == policyId);
+
+        if (userPolicy is not null)
+        {
+            db.UserPolicies.Remove(userPolicy);
             await db.SaveChangesAsync();
         }
 

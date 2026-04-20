@@ -60,7 +60,7 @@ public partial class CollectionTypeModule
         // ── Per-collection query fields with paging/filter/sort ──
         foreach (var collection in collections)
         {
-            BuildCollectionQueryField(collection, collectionTypeMap, context, collectionEntriesTypeDef);
+            BuildCollectionQueryField(collection, context, collectionEntriesTypeDef);
         }
 
         // ── Wire entries field onto CollectionQuery root ──
@@ -85,7 +85,7 @@ public partial class CollectionTypeModule
     /// </summary>
     private static void BuildCollectionQueryField(
         Collection collection,
-        Dictionary<Guid, string> collectionTypeMap,
+
         IDescriptorContext context,
         ObjectTypeDefinition collectionEntriesTypeDef)
     {
@@ -165,6 +165,8 @@ public partial class CollectionTypeModule
                     DynamicCollectionHelpers.AddDynamicSortField(sortDesc, field);
                 }
             });
+
+        
 
         collectionEntriesTypeDef.Fields.Add(fieldDescriptor.ToDefinition());
     }

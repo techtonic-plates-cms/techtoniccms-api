@@ -92,7 +92,7 @@ builder.AddGraphQL()
         options.IncludeExceptionDetails = builder.Environment.IsDevelopment();
     })
     .AddTypeModule<CollectionTypeModule>()
-
+    .TryAddTypeInterceptor<CollectionConnectionTypeInterceptor>()
     .AddTypes();
 
 var app = builder.Build();

@@ -254,6 +254,11 @@ public class CollectionMutation
         if (policies.Count > 0)
         {
             var assignedAt = DateTime.UtcNow;
+            var existingUserPolicies = from up in db.UserPolicies
+                where up.UserId == userId && creatorPolicyNames.Contains(up.Policy.Name)
+                select up;
+
+
             db.UserPolicies.AddRange(policies.Select(p => new UserPolicy
             {
                 Id = Guid.NewGuid(),
@@ -261,7 +266,7 @@ public class CollectionMutation
                 PolicyId = p.Id,
                 AssignedBy = userId,
                 AssignedAt = assignedAt
-            }));
+            }).Where(up => !existingUserPolicies.Any(eup => eup.PolicyId == up.PolicyId)));
             await db.SaveChangesAsync();
         }
 

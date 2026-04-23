@@ -8,5 +8,6 @@ public enum BaseResource
     Users,
     Collections,
     Entries,
-    Assets
+    Assets,
+    ApiKeys
 }

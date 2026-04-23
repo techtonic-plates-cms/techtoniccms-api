@@ -148,6 +148,56 @@ public static class AdminBootstrapService
 
         await db.SaveChangesAsync();
 
+        var apiKeyCreatorPolicies = new[]
+        {
+            (Name: "apikeys-read-by-owner",    Action: PermissionAction.Read),
+            (Name: "apikeys-update-by-owner",  Action: PermissionAction.Update),
+            (Name: "apikeys-delete-by-owner",  Action: PermissionAction.Delete),
+        };
+
+        foreach (var (name, action) in apiKeyCreatorPolicies)
+        {
+            var exists = await db.AbacPolicies.AnyAsync(p => p.Name == name);
+            if (exists) continue;
+
+            var now = DateTime.UtcNow;
+            var policyId = Guid.NewGuid();
+            var policy = new AbacPolicy
+            {
+                Id = policyId,
+                Name = name,
+                Description = $"Allow api key {action.ToString().ToLowerInvariant()} for the key's owner",
+                Effect = PermissionEffect.Allow,
+                Priority = 500,
+                IsActive = true,
+                ResourceType = BaseResource.ApiKeys,
+                ActionType = action,
+                RuleConnector = LogicalOperator.And,
+                CreatedBy = adminUser.Id,
+                CreatedAt = now,
+                UpdatedAt = now,
+                Rules =
+                [
+                    new AbacPolicyRule
+                    {
+                        Id = Guid.NewGuid(),
+                        PolicyId = policyId,
+                        AttributePath = AttributePath.ResourceApiKeyUserId,
+                        Operator = OperatorType.EqContextRef,
+                        ExpectedValue = nameof(AttributePath.SubjectId),
+                        ValueType = Schema.TechtonicCms.Enums.ValueType.Uuid,
+                        IsActive = true,
+                        Order = 1,
+                        CreatedAt = now
+                    }
+                ]
+            };
+
+            db.AbacPolicies.Add(policy);
+        }
+
+        await db.SaveChangesAsync();
+
         var hasAdminRole = await db.UserRoles
             .AnyAsync(ur => ur.UserId == adminUser.Id && ur.RoleId == adminRole.Id);
 

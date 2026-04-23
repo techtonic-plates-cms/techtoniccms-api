@@ -25,6 +25,7 @@ public enum AttributePath
     ResourceAssetFileSize,
     ResourceUserId,
     ResourceUserStatus,
+    ResourceApiKeyUserId,
     EnvironmentCurrentTime,
     EnvironmentIpAddress,
     EnvironmentUserAgent,

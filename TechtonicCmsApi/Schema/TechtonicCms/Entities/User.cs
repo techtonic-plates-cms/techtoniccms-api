@@ -52,4 +52,6 @@ public class User
     public ICollection<AbacEvaluationCache> EvaluationCaches { get; set; } = new List<AbacEvaluationCache>();
     [GraphQLIgnore]
     public ICollection<AbacAudit> AuditLogs { get; set; } = new List<AbacAudit>();
+    [GraphQLIgnore]
+    public ICollection<ApiKey> ApiKeys { get; set; } = new List<ApiKey>();
 }

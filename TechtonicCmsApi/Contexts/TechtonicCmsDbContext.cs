@@ -24,6 +24,7 @@ public class TechtonicCmsDbContext : DbContext
     public DbSet<EntryRelation> EntryRelations => Set<EntryRelation>();
     public DbSet<EntrySchedules> EntrySchedules => Set<EntrySchedules>();
     public DbSet<Asset> Assets => Set<Asset>();
+    public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -44,6 +45,7 @@ public class TechtonicCmsDbContext : DbContext
         ConfigureEntryRelation(modelBuilder);
         ConfigureEntrySchedules(modelBuilder);
         ConfigureAsset(modelBuilder);
+        ConfigureApiKey(modelBuilder);
     }
 
     private static void RegisterEnums(ModelBuilder modelBuilder)
@@ -322,5 +324,18 @@ public class TechtonicCmsDbContext : DbContext
         });
     }
 
+    private static void ConfigureApiKey(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ApiKey>(e =>
+        {
+            e.Property(a => a.Id).HasDefaultValueSql("gen_random_uuid()");
+            e.Property(a => a.CreatedAt).HasDefaultValueSql("now()");
+            e.Property(a => a.UpdatedAt).HasDefaultValueSql("now()");
+            e.Property(a => a.IsActive).HasDefaultValue(true);
 
+            e.HasOne(a => a.User)
+                .WithMany(u => u.ApiKeys)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+    }
 }

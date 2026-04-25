@@ -35,7 +35,6 @@ public static class AdminBootstrapService
             await db.SaveChangesAsync();
 
             Console.WriteLine($"Default admin user created: {adminName}");
-            Console.WriteLine("Password: " + adminPassword);
             Console.WriteLine("Please change the password after first login!");
         }
 

@@ -20,15 +20,17 @@ namespace TechtonicCmsApi.Services;
 public class AbacService
 {
     private readonly TechtonicCmsDbContext _db;
+    private readonly IHttpContextAccessor _httpContextAccessor;
 
     /// <summary>Cache TTL for positive (Allow) evaluations.</summary>
     private static readonly TimeSpan CacheTtlAllow = TimeSpan.FromMinutes(5);
     /// <summary>Cache TTL for negative (Deny) evaluations — shorter to allow quick recovery.</summary>
     private static readonly TimeSpan CacheTtlDeny = TimeSpan.FromMinutes(2);
 
-    public AbacService(TechtonicCmsDbContext db)
+    public AbacService(TechtonicCmsDbContext db, IHttpContextAccessor httpContextAccessor)
     {
         _db = db;
+        _httpContextAccessor = httpContextAccessor;
     }
 
     public async Task<bool> CheckPermissionAsync(
@@ -47,26 +49,9 @@ public class AbacService
             return cached.Value;
 
         // ── Full evaluation ───────────────────────────────────────
-        var now = DateTime.UtcNow;
+        var policies = await GetApplicablePoliciesAsync(userId, resourceType, action);
 
-        var roleIds = await _db.UserRoles
-            .Where(ur => ur.UserId == userId && (ur.ExpiresAt == null || ur.ExpiresAt > now))
-            .Select(ur => ur.RoleId)
-            .ToListAsync();
-
-        var policyIdsFromRoles = await _db.RolePolicies
-            .Where(rp => roleIds.Contains(rp.RoleId) && (rp.ExpiresAt == null || rp.ExpiresAt > now))
-            .Select(rp => rp.PolicyId)
-            .ToListAsync();
-
-        var policyIdsDirect = await _db.UserPolicies
-            .Where(up => up.UserId == userId && (up.ExpiresAt == null || up.ExpiresAt > now))
-            .Select(up => up.PolicyId)
-            .ToListAsync();
-
-        var allPolicyIds = policyIdsFromRoles.Concat(policyIdsDirect).ToHashSet();
-
-        if (allPolicyIds.Count == 0)
+        if (policies.Count == 0)
         {
             stopwatch.Stop();
             await WriteAuditAsync(userId, resourceType, resourceId, action, fieldId,
@@ -74,13 +59,6 @@ public class AbacService
                 stopwatch.ElapsedMilliseconds, resourceData);
             return false;
         }
-
-        var policies = await _db.AbacPolicies
-            .Where(p => allPolicyIds.Contains(p.Id)
-                && p.ResourceType == resourceType
-                && p.ActionType == action
-                && p.IsActive)
-            .ToListAsync();
 
         var denyPolicies = policies
             .Where(p => p.Effect == PermissionEffect.Deny)
@@ -92,7 +70,7 @@ public class AbacService
             .OrderByDescending(p => p.Priority)
             .ToList();
 
-        var context = BuildContext(userId, resourceData);
+        var context = await BuildContextAsync(userId, action, resourceData);
         var evaluatedPolicyIds = policies.Select(p => p.Id).ToArray();
         var matchingPolicyIds = new List<Guid>();
 
@@ -142,6 +120,41 @@ public class AbacService
             "No matching allow policy found", stopwatch.ElapsedMilliseconds, resourceData);
 
         return false;
+    }
+
+    private async Task<List<AbacPolicy>> GetApplicablePoliciesAsync(
+        Guid userId,
+        BaseResource resourceType,
+        PermissionAction action)
+    {
+        var now = DateTime.UtcNow;
+
+        var roleIds = await _db.UserRoles
+            .Where(ur => ur.UserId == userId && (ur.ExpiresAt == null || ur.ExpiresAt > now))
+            .Select(ur => ur.RoleId)
+            .ToListAsync();
+
+        var policyIdsFromRoles = await _db.RolePolicies
+            .Where(rp => roleIds.Contains(rp.RoleId) && (rp.ExpiresAt == null || rp.ExpiresAt > now))
+            .Select(rp => rp.PolicyId)
+            .ToListAsync();
+
+        var policyIdsDirect = await _db.UserPolicies
+            .Where(up => up.UserId == userId && (up.ExpiresAt == null || up.ExpiresAt > now))
+            .Select(up => up.PolicyId)
+            .ToListAsync();
+
+        var allPolicyIds = policyIdsFromRoles.Concat(policyIdsDirect).ToHashSet();
+
+        if (allPolicyIds.Count == 0)
+            return new List<AbacPolicy>();
+
+        return await _db.AbacPolicies
+            .Where(p => allPolicyIds.Contains(p.Id)
+                && p.ResourceType == resourceType
+                && p.ActionType == action
+                && p.IsActive)
+            .ToListAsync();
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -194,8 +207,18 @@ public class AbacService
             query = query.Where(c => c.FieldId == null);
 
         var cached = await query.FirstOrDefaultAsync();
-        return cached?.Decision == PermissionEffect.Allow ? true
-             : cached?.Decision == PermissionEffect.Deny ? false
+        if (cached is null)
+            return null;
+
+        var currentPolicies = await GetApplicablePoliciesAsync(userId, resourceType, action);
+        var currentPolicyVersions = string.Join(",",
+            currentPolicies.Select(p => $"{p.Id}:{p.UpdatedAt:O}"));
+
+        if (currentPolicyVersions != cached.PolicyVersions)
+            return null;
+
+        return cached.Decision == PermissionEffect.Allow ? true
+             : cached.Decision == PermissionEffect.Deny ? false
              : null;
     }
 
@@ -396,14 +419,42 @@ public class AbacService
         };
     }
 
-    private static Dictionary<string, object?> BuildContext(
+    private async Task<Dictionary<string, object?>> BuildContextAsync(
         Guid userId,
+        PermissionAction action,
         Dictionary<string, object?>? resourceData)
     {
         var context = new Dictionary<string, object?>
         {
-            ["SubjectId"] = userId.ToString()
+            ["SubjectId"] = userId.ToString(),
+            ["ActionType"] = action.ToString().ToUpperInvariant(),
+            ["EnvironmentCurrentTime"] = DateTime.UtcNow.ToString("o")
         };
+
+        var user = await _db.Users
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Id == userId);
+        if (user is not null)
+        {
+            context["SubjectStatus"] = user.Status.ToString();
+        }
+
+        var roleNames = await _db.UserRoles
+            .AsNoTracking()
+            .Where(ur => ur.UserId == userId && (ur.ExpiresAt == null || ur.ExpiresAt > DateTime.UtcNow))
+            .Join(_db.Roles, ur => ur.RoleId, r => r.Id, (ur, r) => r.Name)
+            .ToListAsync();
+
+        if (roleNames.Count > 0)
+        {
+            context["SubjectRole"] = string.Join(",", roleNames);
+        }
+
+        if (_httpContextAccessor.HttpContext is not null)
+        {
+            context["EnvironmentIpAddress"] = _httpContextAccessor.HttpContext.Connection.RemoteIpAddress?.ToString() ?? "";
+            context["EnvironmentUserAgent"] = _httpContextAccessor.HttpContext.Request.Headers.UserAgent.FirstOrDefault() ?? "";
+        }
 
         if (resourceData != null)
         {

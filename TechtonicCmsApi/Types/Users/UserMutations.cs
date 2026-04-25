@@ -209,6 +209,7 @@ public class UserMutation
         return true;
     }
 
+    [Authorize]
     public async Task<bool> ChangePassword(
         ChangePasswordInput input,
         [Service] TechtonicCmsDbContext db,

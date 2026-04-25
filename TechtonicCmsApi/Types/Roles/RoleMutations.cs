@@ -46,7 +46,7 @@ public class AssignPolicyToRoleInput
 
 public class RoleMutation
 {
-    [Authorize(Policy = "Users:Create")]
+    [Authorize(Policy = "Roles:Create")]
     public async Task<RoleEntity> Create(
         CreateRoleInput input,
         [Service] TechtonicCmsDbContext db,
@@ -87,7 +87,7 @@ public class RoleMutation
         return role;
     }
 
-    [Authorize(Policy = "Users:Update")]
+    [Authorize(Policy = "Roles:Update")]
     public async Task<RoleEntity> Update(
         UpdateRoleInput input,
         [Service] TechtonicCmsDbContext db)
@@ -111,7 +111,7 @@ public class RoleMutation
         return role;
     }
 
-    [Authorize(Policy = "Users:Delete")]
+    [Authorize(Policy = "Roles:Delete")]
     public async Task<bool> Delete(
         Guid id,
         [Service] TechtonicCmsDbContext db)
@@ -126,7 +126,7 @@ public class RoleMutation
         return true;
     }
 
-    [Authorize(Policy = "Users:Update")]
+    [Authorize(Policy = "Roles:Update")]
     public async Task<bool> AssignPolicy(
         AssignPolicyToRoleInput input,
         [Service] TechtonicCmsDbContext db,
@@ -175,7 +175,7 @@ public class RoleMutation
         return true;
     }
 
-    [Authorize(Policy = "Users:Update")]
+    [Authorize(Policy = "Roles:Update")]
     public async Task<bool> UnassignPolicy(
         Guid roleId,
         Guid policyId,

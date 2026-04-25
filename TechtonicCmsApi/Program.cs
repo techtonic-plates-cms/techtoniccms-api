@@ -1,10 +1,14 @@
+using System.IdentityModel.Tokens.Jwt;
+
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using TechtonicCmsApi.Contexts;
 using TechtonicCmsApi.Schema.TechtonicCms;
+using TechtonicCmsApi.Schema.TechtonicCms.Enums;
 using TechtonicCmsApi.Security;
 using TechtonicCmsApi.Services;
 using TechtonicCmsApi.Types.Assets;
@@ -53,6 +57,40 @@ else if (!string.IsNullOrWhiteSpace(rsaPublicKeyPem))
 
 var rsaKey = new RsaSecurityKey(rsa);
 
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddFixedWindowLimiter("Login", opt =>
+    {
+        opt.PermitLimit = 10;
+        opt.Window = TimeSpan.FromMinutes(1);
+        opt.QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst;
+        opt.QueueLimit = 0;
+    });
+
+    options.AddTokenBucketLimiter("Upload", opt =>
+    {
+        opt.TokenLimit = 10;
+        opt.QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst;
+        opt.QueueLimit = 0;
+        opt.ReplenishmentPeriod = TimeSpan.FromMinutes(1);
+        opt.TokensPerPeriod = 5;
+    });
+
+    options.AddFixedWindowLimiter("GeneralApi", opt =>
+    {
+        opt.PermitLimit = 100;
+        opt.Window = TimeSpan.FromMinutes(1);
+        opt.QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst;
+        opt.QueueLimit = 0;
+    });
+
+    options.OnRejected = (context, cancellationToken) =>
+    {
+        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        return ValueTask.CompletedTask;
+    };
+});
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -65,6 +103,41 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             IssuerSigningKey = rsaKey,
             ValidateIssuerSigningKey = true,
             ClockSkew = TimeSpan.Zero,
+        };
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = async context =>
+            {
+                var sessionId = context.Principal?.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+                if (sessionId is null)
+                {
+                    context.Fail("Invalid token: missing session claim");
+                    return;
+                }
+
+                var sessionService = context.HttpContext.RequestServices.GetRequiredService<SessionService>();
+                var session = await sessionService.GetSessionAsync(sessionId);
+                if (session is null)
+                {
+                    context.Fail("Session revoked");
+                    return;
+                }
+
+                var userIdStr = context.Principal?.FindFirst("userId")?.Value;
+                if (userIdStr is null || !Guid.TryParse(userIdStr, out var userId))
+                {
+                    context.Fail("Invalid token: missing user claim");
+                    return;
+                }
+
+                var dbFactory = context.HttpContext.RequestServices.GetRequiredService<IDbContextFactory<TechtonicCmsDbContext>>();
+                await using var db = await dbFactory.CreateDbContextAsync();
+                var user = await db.Users.FindAsync(userId);
+                if (user is null || user.Status == UserStatus.Inactive)
+                {
+                    context.Fail("User inactive");
+                }
+            }
         };
     })
     .AddScheme<AuthenticationSchemeOptions, ApiKeyAuthenticationHandler>("ApiKey", null);
@@ -88,7 +161,9 @@ builder.AddGraphQL()
 .ModifyCostOptions(options =>
 {
     options.MaxFieldCost = 5000;
+    options.MaxTypeCost = 1000;
 })
+.AddMaxExecutionDepthRule(15)
     .AddAuthorization()
     .AddProjections()
     .AddFiltering()
@@ -117,11 +192,12 @@ using (var scope = app.Services.CreateScope())
 
 app.UseSecurityHeaders();
 
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapAssetEndpoints();
 
-app.MapGraphQL();
+app.MapGraphQL().RequireRateLimiting("GeneralApi");
 
 app.RunWithGraphQLCommands(args);

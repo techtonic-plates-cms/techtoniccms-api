@@ -9,5 +9,7 @@ public enum BaseResource
     Collections,
     Entries,
     Assets,
-    ApiKeys
+    ApiKeys,
+    Policies,
+    Roles
 }

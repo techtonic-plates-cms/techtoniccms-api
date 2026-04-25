@@ -22,6 +22,8 @@ Your goal is to perform a structured security audit of the codebase and produce 
 
 Execute all phases in order unless the user explicitly requested a focused audit. In a focused audit, skip irrelevant phases but still read `Program.cs` and `.dev.env` for baseline context.
 
+Remember `.dev.env` may contain critical clues about secrets, environment gating, and configuration that impact all phases but given it is used for local development, it will not be loaded into production environments. 
+
 ### Phase 0 — Scope Selection
 
 If the invoking prompt does not specify a scope, ask the user which areas to audit. Otherwise, proceed with the specified scope.

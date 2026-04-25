@@ -7,7 +7,7 @@ public class PasswordService
 {
     public string HashPassword(string password)
     {
-        return BCrypt.Net.BCrypt.HashPassword(password);
+        return BCrypt.Net.BCrypt.HashPassword(password, 12);
     }
 
     public (bool isValid, string? newHash) VerifyPassword(string password, string existingHash)

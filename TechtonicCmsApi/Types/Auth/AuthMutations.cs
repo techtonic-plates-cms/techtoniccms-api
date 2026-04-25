@@ -3,6 +3,7 @@ using System.Security.Claims;
 
 using HotChocolate.Authorization;
 
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using TechtonicCmsApi.Contexts;
 using TechtonicCmsApi.Schema.TechtonicCms;
@@ -15,6 +16,7 @@ namespace TechtonicCmsApi.Types.Auth;
 public class AuthMutation
 {
     [AllowAnonymous]
+    [EnableRateLimiting("Login")]
     public async Task<LoginPayload> Login(
         string name,
         string password,
@@ -58,8 +60,8 @@ public class AuthMutation
         var (accessToken, sessionId) = await authService.GenerateAccessTokenAsync(user.Id, user.Name);
         var refreshToken = await authService.GenerateRefreshTokenAsync(user.Id, sessionId);
 
-        var accessTokenExpiry = new DateTime().AddMinutes(15).ToUniversalTime().Subtract(DateTime.UnixEpoch).TotalSeconds;
-        var refreshTokenExpiry = new DateTime().AddDays(30).ToUniversalTime().Subtract(DateTime.UnixEpoch).TotalSeconds;
+        var accessTokenExpiry = DateTime.UtcNow.AddMinutes(15).ToUniversalTime().Subtract(DateTime.UnixEpoch).TotalSeconds;
+        var refreshTokenExpiry = DateTime.UtcNow.AddDays(30).ToUniversalTime().Subtract(DateTime.UnixEpoch).TotalSeconds;
 
         return new LoginPayload
         {
@@ -70,6 +72,7 @@ public class AuthMutation
     }
 
     [AllowAnonymous]
+    [EnableRateLimiting("Login")]
     public async Task<RefreshPayload> Refresh(
         string refreshToken,
         [Service] AuthService authService,
@@ -136,8 +139,8 @@ public class AuthMutation
 
         var (newAccessToken, newSessionId) = await authService.GenerateAccessTokenAsync(userId, session.UserName);
         var newRefresh = await authService.GenerateRefreshTokenAsync(userId, newSessionId);
-        var accessTokenExpiry = new DateTime().AddMinutes(15).ToUniversalTime().Subtract(DateTime.UnixEpoch).TotalSeconds;
-        var refreshTokenExpiry = new DateTime().AddDays(30).ToUniversalTime().Subtract(DateTime.UnixEpoch).TotalSeconds;
+        var accessTokenExpiry = DateTime.UtcNow.AddMinutes(15).ToUniversalTime().Subtract(DateTime.UnixEpoch).TotalSeconds;
+        var refreshTokenExpiry = DateTime.UtcNow.AddDays(30).ToUniversalTime().Subtract(DateTime.UnixEpoch).TotalSeconds;
         await sessionService.DeleteSessionAsync(tokenData.SessionId, tokenData.UserId);
 
         return new RefreshPayload { AccessToken = new() { TokenValue = newAccessToken, ExpiresAt = DateTime.UnixEpoch.AddSeconds(accessTokenExpiry) }, RefreshToken = new() { TokenValue = newRefresh, ExpiresAt = DateTime.UnixEpoch.AddSeconds(refreshTokenExpiry) } };

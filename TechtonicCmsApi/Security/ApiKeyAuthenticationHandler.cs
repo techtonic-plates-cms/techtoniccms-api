@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using TechtonicCmsApi.Contexts;
+using TechtonicCmsApi.Schema.TechtonicCms.Enums;
 using TechtonicCmsApi.Services;
 
 namespace TechtonicCmsApi.Security;
@@ -49,6 +50,9 @@ public class ApiKeyAuthenticationHandler : AuthenticationHandler<AuthenticationS
         {
             return AuthenticateResult.Fail("API key expired");
         }
+
+        if (apiKey.User.Status != UserStatus.Active)
+            return AuthenticateResult.Fail("User inactive");
 
         apiKey.LastUsedAt = DateTime.UtcNow;
         await db.SaveChangesAsync();

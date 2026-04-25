@@ -106,7 +106,7 @@ public class UpdatePolicyInput
 
 public class PolicyMutation
 {
-    [Authorize(Policy = "Users:Create")]
+    [Authorize(Policy = "Policies:Create")]
     public async Task<PolicyEntity> Create(
         CreatePolicyInput input,
         [Service] TechtonicCmsDbContext db,
@@ -163,7 +163,7 @@ public class PolicyMutation
         return policy;
     }
 
-    [Authorize(Policy = "Users:Update")]
+    [Authorize(Policy = "Policies:Update")]
     public async Task<PolicyEntity> Update(
         UpdatePolicyInput input,
         [Service] TechtonicCmsDbContext db)
@@ -266,7 +266,7 @@ public class PolicyMutation
         return policy;
     }
 
-    [Authorize(Policy = "Users:Delete")]
+    [Authorize(Policy = "Policies:Delete")]
     public async Task<bool> Delete(
         Guid id,
         [Service] TechtonicCmsDbContext db)

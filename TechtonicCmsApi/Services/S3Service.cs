@@ -20,8 +20,7 @@ public class S3Service
 {
     private readonly IAmazonS3 _s3;
     private readonly S3Options _options;
-
-
+    private bool _bucketChecked;
 
     public S3Service(IOptions<S3Options> options)
     {
@@ -29,25 +28,33 @@ public class S3Service
         var config = new AmazonS3Config
         {
             ServiceURL = _options.Endpoint,
-
             ForcePathStyle = true
         };
 
         if (_options.Region is not null)
         {
-            config.RegionEndpoint = Amazon.RegionEndpoint.GetBySystemName(_options.Region); 
+            config.RegionEndpoint = Amazon.RegionEndpoint.GetBySystemName(_options.Region);
         }
         var credentials = new BasicAWSCredentials(_options.AccessKey, _options.SecretKey);
         _s3 = new AmazonS3Client(credentials, config);
+    }
 
-        if (!AmazonS3Util.DoesS3BucketExistV2Async(_s3, _options.Bucket).GetAwaiter().GetResult())
+    private async Task EnsureBucketExistsAsync()
+    {
+        if (_bucketChecked)
+            return;
+
+        if (!await AmazonS3Util.DoesS3BucketExistV2Async(_s3, _options.Bucket))
         {
-            _s3.PutBucketAsync(new PutBucketRequest { BucketName = _options.Bucket }).GetAwaiter().GetResult();
+            await _s3.PutBucketAsync(new PutBucketRequest { BucketName = _options.Bucket });
         }
+
+        _bucketChecked = true;
     }
 
     public async Task<string> UploadAsync(string key, Stream body, string contentType)
     {
+        await EnsureBucketExistsAsync();
         var request = new PutObjectRequest
         {
             BucketName = _options.Bucket,
@@ -61,6 +68,7 @@ public class S3Service
 
     public async Task<Stream?> DownloadAsync(string key)
     {
+        await EnsureBucketExistsAsync();
         try
         {
             var request = new GetObjectRequest
@@ -89,6 +97,7 @@ public class S3Service
 
     public async Task<bool> ExistsAsync(string key)
     {
+        await EnsureBucketExistsAsync();
         try
         {
             var request = new GetObjectMetadataRequest

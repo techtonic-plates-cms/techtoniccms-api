@@ -1,9 +1,10 @@
 using System.Text.Json;
 using StackExchange.Redis;
+using TechtonicCmsApi.Schema.TechtonicCms.Enums;
 
 namespace TechtonicCmsApi.Services;
 
-public record SessionData(string UserId, string UserName, DateTime CreatedAt, DateTime ExpiresAt);
+public record SessionData(string UserId, string UserName, DateTime CreatedAt, DateTime ExpiresAt, UserStatus Status);
 
 public record RefreshTokenData(string UserId, string SessionId, DateTime CreatedAt, DateTime ExpiresAt);
 
@@ -19,10 +20,10 @@ public class SessionService
         _db = redisService.Database;
     }
 
-    public async Task<SessionData> CreateSessionAsync(string sessionId, string userId, string userName)
+    public async Task<SessionData> CreateSessionAsync(string sessionId, string userId, string userName, UserStatus status)
     {
         var now = DateTime.UtcNow;
-        var session = new SessionData(userId, userName, now, now.Add(SessionTtl));
+        var session = new SessionData(userId, userName, now, now.Add(SessionTtl), status);
         var json = JsonSerializer.Serialize(session);
 
         var batch = _db.CreateBatch();

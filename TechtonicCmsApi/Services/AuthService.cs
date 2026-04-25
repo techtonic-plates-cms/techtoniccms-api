@@ -5,6 +5,8 @@ using System.Security.Cryptography;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
+using TechtonicCmsApi.Schema.TechtonicCms.Enums;
+
 namespace TechtonicCmsApi.Services;
 
 public class JwtOptions
@@ -59,10 +61,10 @@ public class AuthService
         };
     }
 
-    public async Task<(string Token, string SessionId)> GenerateAccessTokenAsync(Guid userId, string userName)
+    public async Task<(string Token, string SessionId)> GenerateAccessTokenAsync(Guid userId, string userName, UserStatus status)
     {
         var sessionId = Guid.NewGuid().ToString();
-        await _sessionService.CreateSessionAsync(sessionId, userId.ToString(), userName);
+        await _sessionService.CreateSessionAsync(sessionId, userId.ToString(), userName, status);
 
         var now = DateTime.UtcNow;
         var tokenDescriptor = new SecurityTokenDescriptor

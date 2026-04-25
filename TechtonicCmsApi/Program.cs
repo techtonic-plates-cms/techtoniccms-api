@@ -123,17 +123,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                     return;
                 }
 
-                var userIdStr = context.Principal?.FindFirst("userId")?.Value;
-                if (userIdStr is null || !Guid.TryParse(userIdStr, out var userId))
-                {
-                    context.Fail("Invalid token: missing user claim");
-                    return;
-                }
-
-                var dbFactory = context.HttpContext.RequestServices.GetRequiredService<IDbContextFactory<TechtonicCmsDbContext>>();
-                await using var db = await dbFactory.CreateDbContextAsync();
-                var user = await db.Users.FindAsync(userId);
-                if (user is null || user.Status == UserStatus.Inactive)
+                if (session.Status == UserStatus.Inactive)
                 {
                     context.Fail("User inactive");
                 }

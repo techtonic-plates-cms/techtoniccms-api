@@ -57,7 +57,7 @@ public class AuthMutation
         user.LastLoginTime = DateTime.UtcNow;
         await db.SaveChangesAsync();
 
-        var (accessToken, sessionId) = await authService.GenerateAccessTokenAsync(user.Id, user.Name);
+        var (accessToken, sessionId) = await authService.GenerateAccessTokenAsync(user.Id, user.Name, user.Status);
         var refreshToken = await authService.GenerateRefreshTokenAsync(user.Id, sessionId);
 
         var accessTokenExpiry = DateTime.UtcNow.AddMinutes(15).ToUniversalTime().Subtract(DateTime.UnixEpoch).TotalSeconds;
@@ -137,7 +137,7 @@ public class AuthMutation
                 .Build());
         }
 
-        var (newAccessToken, newSessionId) = await authService.GenerateAccessTokenAsync(userId, session.UserName);
+        var (newAccessToken, newSessionId) = await authService.GenerateAccessTokenAsync(userId, session.UserName, user.Status);
         var newRefresh = await authService.GenerateRefreshTokenAsync(userId, newSessionId);
         var accessTokenExpiry = DateTime.UtcNow.AddMinutes(15).ToUniversalTime().Subtract(DateTime.UnixEpoch).TotalSeconds;
         var refreshTokenExpiry = DateTime.UtcNow.AddDays(30).ToUniversalTime().Subtract(DateTime.UnixEpoch).TotalSeconds;

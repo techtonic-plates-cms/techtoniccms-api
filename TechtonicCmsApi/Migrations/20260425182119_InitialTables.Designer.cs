@@ -13,8 +13,8 @@ using TechtonicCmsApi.Contexts;
 namespace TechtonicCmsApi.Migrations
 {
     [DbContext(typeof(TechtonicCmsDbContext))]
-    [Migration("20260420173649_AddScheduledActionToEntrySchedules")]
-    partial class AddScheduledActionToEntrySchedules
+    [Migration("20260425182119_InitialTables")]
+    partial class InitialTables
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -24,17 +24,17 @@ namespace TechtonicCmsApi.Migrations
                 .HasAnnotation("ProductVersion", "10.0.5")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
-            NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "attribute_path", new[] { "subject_id", "subject_role", "subject_status", "subject_created_at", "resource_collection_id", "resource_collection_slug", "resource_collection_created_by", "resource_collection_is_localized", "resource_entry_id", "resource_entry_status", "resource_entry_created_by", "resource_entry_collection_id", "resource_entry_locale", "resource_entry_published_at", "resource_asset_id", "resource_asset_uploaded_by", "resource_asset_mime_type", "resource_asset_file_size", "resource_user_id", "resource_user_status", "environment_current_time", "environment_ip_address", "environment_user_agent", "action_type" });
-            NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "base_resource", new[] { "users", "collections", "entries", "assets" });
+            NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "attribute_path", new[] { "subject_id", "subject_role", "subject_status", "subject_created_at", "resource_collection_id", "resource_collection_slug", "resource_collection_created_by", "resource_collection_is_localized", "resource_entry_id", "resource_entry_status", "resource_entry_created_by", "resource_entry_collection_id", "resource_entry_locale", "resource_entry_published_at", "resource_asset_id", "resource_asset_uploaded_by", "resource_asset_mime_type", "resource_asset_file_size", "resource_user_id", "resource_user_status", "resource_api_key_user_id", "environment_current_time", "environment_ip_address", "environment_user_agent", "action_type" });
+            NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "base_resource", new[] { "users", "collections", "entries", "assets", "api_keys" });
             NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "entry_status", new[] { "draft", "published", "archived", "deleted" });
             NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "field_data_type", new[] { "text", "boolean", "number", "date_time", "relation", "asset", "object" });
             NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "locale", new[] { "en", "es", "fr", "de", "it", "pt", "ja", "ko", "zh", "ar", "ru" });
             NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "logical_operator", new[] { "and", "or" });
             NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "operator_type", new[] { "eq", "ne", "in", "not_in", "gt", "gte", "lt", "lte", "contains", "starts_with", "ends_with", "is_null", "is_not_null", "regex", "eq_context_ref" });
-            NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "permission_action", new[] { "create", "read", "update", "delete", "publish", "unpublish", "schedule", "archive", "restore", "ban", "unban", "activate", "deactivate", "upload", "download", "manage_schema" });
+            NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "permission_action", new[] { "create", "read", "update", "delete", "publish", "unpublish", "schedule", "archive", "restore", "activate", "deactivate", "upload", "download", "manage_schema" });
             NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "permission_effect", new[] { "allow", "deny" });
             NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "scheduled_action", new[] { "publish", "unpublish", "archive", "restore", "delete" });
-            NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "user_status", new[] { "active", "inactive", "banned" });
+            NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "user_status", new[] { "active", "inactive" });
             NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "value_type", new[] { "string", "number", "boolean", "uuid", "datetime", "array" });
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
@@ -304,6 +304,64 @@ namespace TechtonicCmsApi.Migrations
                     b.HasIndex("PolicyId", "Order");
 
                     b.ToTable("abac_policy_rules");
+                });
+
+            modelBuilder.Entity("TechtonicCmsApi.Schema.TechtonicCms.Entities.ApiKey", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTime?>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<string>("KeyHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("KeyPrefix")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<DateTime?>("LastUsedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IsActive");
+
+                    b.HasIndex("KeyHash")
+                        .IsUnique();
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("api_keys");
                 });
 
             modelBuilder.Entity("TechtonicCmsApi.Schema.TechtonicCms.Entities.Asset", b =>
@@ -917,6 +975,17 @@ namespace TechtonicCmsApi.Migrations
                     b.Navigation("Policy");
                 });
 
+            modelBuilder.Entity("TechtonicCmsApi.Schema.TechtonicCms.Entities.ApiKey", b =>
+                {
+                    b.HasOne("TechtonicCmsApi.Schema.TechtonicCms.Entities.User", "User")
+                        .WithMany("ApiKeys")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("TechtonicCmsApi.Schema.TechtonicCms.Entities.Asset", b =>
                 {
                     b.HasOne("TechtonicCmsApi.Schema.TechtonicCms.Entities.User", "UploadedByUser")
@@ -1165,6 +1234,8 @@ namespace TechtonicCmsApi.Migrations
 
             modelBuilder.Entity("TechtonicCmsApi.Schema.TechtonicCms.Entities.User", b =>
                 {
+                    b.Navigation("ApiKeys");
+
                     b.Navigation("AssignedPolicies");
 
                     b.Navigation("AuditLogs");

@@ -147,3 +147,32 @@ Filter and sort descriptors are also generated per field — scalar fields use `
 - **Password migration:** `PasswordService` transparently upgrades SHA256 → BCrypt on login (legacy accounts upgrade on first successful login).
 - **Admin bootstrap:** `AdminBootstrapService` seeds admin user + 64 default ABAC policies (4 resources × 16 active actions) idempotently on startup. `Draft`, `Transform`, and `ConfigureFields` are defined in the enum but excluded from seeding — they have no corresponding mutations.
 - **Multi-locale:** Collections and entries support localization via `Locale` enum (11 languages).
+
+## Agents
+
+### Security Report Agent
+
+A dedicated subagent for security audits lives at `.agents/agents/security-report/`.
+
+**To run a security audit**, read `.agents/agents/security-report/system.md` and launch a subagent with its contents as the prompt:
+
+```
+Agent(
+  description: "Run security audit",
+  prompt: <contents of .agents/agents/security-report/system.md>,
+  subagent_type: "coder"
+)
+```
+
+The agent performs a 6-phase audit (reconnaissance → AuthN → ABAC → GraphQL → infrastructure → report generation) and writes a timestamped markdown report to `security-reports/YYYY-MM-DD-security-report.md`.
+
+**Reference files** (loaded on-demand by the agent):
+- `references/dotnet-security-checklist.md`
+- `references/abac-audit-guide.md`
+- `references/graphql-security-checklist.md`
+- `references/infrastructure-checklist.md`
+
+**Standalone invocation** (outside a session):
+```bash
+kimi --agent-file .agents/agents/security-report/agent.yaml
+```

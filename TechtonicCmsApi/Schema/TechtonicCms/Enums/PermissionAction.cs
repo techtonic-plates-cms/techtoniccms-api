@@ -14,8 +14,6 @@ public enum PermissionAction
     Schedule,
     Archive,
     Restore,
-    Ban,
-    Unban,
     Activate,
     Deactivate,
     Upload,

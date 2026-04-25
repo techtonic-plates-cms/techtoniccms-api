@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using TechtonicCmsApi.Contexts;
 using TechtonicCmsApi.Schema.TechtonicCms;
 using TechtonicCmsApi.Schema.TechtonicCms.Entities;
+using TechtonicCmsApi.Schema.TechtonicCms.Enums;
 using TechtonicCmsApi.Services;
 
 namespace TechtonicCmsApi.Types.Auth;
@@ -19,7 +20,8 @@ public class AuthMutation
         string password,
         [Service] TechtonicCmsDbContext db,
         [Service] PasswordService passwordService,
-        [Service] AuthService authService)
+        [Service] AuthService authService,
+        [Service] SessionService sessionService)
     {
         var user = await db.Users.FirstOrDefaultAsync(u => u.Name == name);
         if (user is null)
@@ -34,6 +36,15 @@ public class AuthMutation
                 .SetMessage("Invalid credentials")
                 .SetCode("UNAUTHENTICATED")
                 .Build());
+
+        if (user.Status == UserStatus.Inactive)
+        {
+            await sessionService.DeleteAllUserSessionsAsync(user.Id.ToString());
+            throw new GraphQLException(ErrorBuilder.New()
+                .SetMessage("Account is inactive")
+                .SetCode("UNAUTHENTICATED")
+                .Build());
+        }
 
         if (newHash is not null)
         {
@@ -62,7 +73,8 @@ public class AuthMutation
     public async Task<RefreshPayload> Refresh(
         string refreshToken,
         [Service] AuthService authService,
-        [Service] SessionService sessionService)
+        [Service] SessionService sessionService,
+        [Service] TechtonicCmsDbContext db)
     {
         ClaimsPrincipal principal;
         try
@@ -110,6 +122,18 @@ public class AuthMutation
                 .Build());
 
         var userId = Guid.Parse(tokenData.UserId);
+
+        var user = await db.Users.FindAsync(userId);
+        if (user is null || user.Status == UserStatus.Inactive)
+        {
+            if (user is not null)
+                await sessionService.DeleteAllUserSessionsAsync(user.Id.ToString());
+            throw new GraphQLException(ErrorBuilder.New()
+                .SetMessage("Account is inactive")
+                .SetCode("UNAUTHENTICATED")
+                .Build());
+        }
+
         var (newAccessToken, newSessionId) = await authService.GenerateAccessTokenAsync(userId, session.UserName);
         var newRefresh = await authService.GenerateRefreshTokenAsync(userId, newSessionId);
         var accessTokenExpiry = new DateTime().AddMinutes(15).ToUniversalTime().Subtract(DateTime.UnixEpoch).TotalSeconds;

@@ -104,6 +104,8 @@ public class CreateCollectionInput
     public bool? IsLocalized { get; set; }
 
     public FieldDefinitionInput[]? Fields { get; set; }
+
+    public string? CreatorPoliciesExpiresAt { get; set; }
 }
 
 public class UpdateCollectionInput
@@ -254,19 +256,28 @@ public class CollectionMutation
         if (policies.Count > 0)
         {
             var assignedAt = DateTime.UtcNow;
-            var existingUserPolicies = from up in db.UserPolicies
-                where up.UserId == userId && creatorPolicyNames.Contains(up.Policy.Name)
-                select up;
+            var expiresAt = input.CreatorPoliciesExpiresAt is not null
+                ? DateTime.Parse(input.CreatorPoliciesExpiresAt, null, System.Globalization.DateTimeStyles.RoundtripKind)
+                : (DateTime?)null;
 
+            var existingPolicyIds = await db.UserPolicies
+                .Where(up => up.UserId == userId && creatorPolicyNames.Contains(up.Policy.Name))
+                .Select(up => up.PolicyId)
+                .ToListAsync();
 
-            db.UserPolicies.AddRange(policies.Select(p => new UserPolicy
-            {
-                Id = Guid.NewGuid(),
-                UserId = userId,
-                PolicyId = p.Id,
-                AssignedBy = userId,
-                AssignedAt = assignedAt
-            }).Where(up => !existingUserPolicies.Any(eup => eup.PolicyId == up.PolicyId)));
+            var policiesToAssign = policies
+                .Where(p => !existingPolicyIds.Contains(p.Id))
+                .Select(p => new UserPolicy
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = userId,
+                    PolicyId = p.Id,
+                    AssignedBy = userId,
+                    AssignedAt = assignedAt,
+                    ExpiresAt = expiresAt
+                });
+
+            db.UserPolicies.AddRange(policiesToAssign);
             await db.SaveChangesAsync();
         }
 

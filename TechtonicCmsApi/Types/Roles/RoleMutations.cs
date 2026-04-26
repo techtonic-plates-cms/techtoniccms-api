@@ -11,6 +11,24 @@ using RoleEntity = TechtonicCmsApi.Schema.TechtonicCms.Entities.Role;
 
 namespace TechtonicCmsApi.Types.Roles;
 
+public class PolicyAssignmentInRoleInput
+{
+    [GraphQLType<NonNullType<IdType>>]
+    public Guid PolicyId { get; set; }
+
+    public string? ExpiresAt { get; set; }
+
+    public string? Reason { get; set; }
+}
+
+[OneOf]
+public class PolicyAssignmentInRoleChoiceInput
+{
+    public Guid[]? Ids { get; set; }
+
+    public PolicyAssignmentInRoleInput[]? Assignments { get; set; }
+}
+
 public class CreateRoleInput
 {
     [GraphQLType<NonNullType<StringType>>]
@@ -18,7 +36,7 @@ public class CreateRoleInput
 
     public string? Description { get; set; }
 
-    public Guid[]? PolicyIds { get; set; }
+    public PolicyAssignmentInRoleChoiceInput? Policies { get; set; }
 }
 
 public class UpdateRoleInput
@@ -67,9 +85,9 @@ public class RoleMutation
         db.Roles.Add(role);
         await db.SaveChangesAsync();
 
-        if (input.PolicyIds is { Length: > 0 })
+        if (input.Policies?.Ids is { Length: > 0 })
         {
-            foreach (var policyId in input.PolicyIds)
+            foreach (var policyId in input.Policies.Ids)
             {
                 db.RolePolicies.Add(new RolePolicy
                 {
@@ -78,6 +96,27 @@ public class RoleMutation
                     PolicyId = policyId,
                     AssignedBy = currentUserId,
                     AssignedAt = DateTime.UtcNow
+                });
+            }
+
+            await db.SaveChangesAsync();
+        }
+
+        if (input.Policies?.Assignments is { Length: > 0 })
+        {
+            foreach (var assignment in input.Policies.Assignments)
+            {
+                db.RolePolicies.Add(new RolePolicy
+                {
+                    Id = Guid.NewGuid(),
+                    RoleId = role.Id,
+                    PolicyId = assignment.PolicyId,
+                    AssignedBy = currentUserId,
+                    AssignedAt = DateTime.UtcNow,
+                    ExpiresAt = assignment.ExpiresAt is not null
+                        ? DateTime.Parse(assignment.ExpiresAt, null, System.Globalization.DateTimeStyles.RoundtripKind)
+                        : null,
+                    Reason = assignment.Reason
                 });
             }
 
@@ -190,6 +229,34 @@ public class RoleMutation
             await db.SaveChangesAsync();
         }
 
+        return true;
+    }
+
+    [Authorize(Policy = "Roles:Update")]
+    public async Task<bool> UpdatePolicyExpiration(
+        Guid roleId,
+        Guid policyId,
+        string? expiresAt,
+        string? reason,
+        [Service] TechtonicCmsDbContext db)
+    {
+        var rolePolicy = await db.RolePolicies
+            .FirstOrDefaultAsync(rp => rp.RoleId == roleId && rp.PolicyId == policyId);
+
+        if (rolePolicy is null)
+            throw new GraphQLException(ErrorBuilder.New()
+                .SetMessage("Policy assignment not found")
+                .SetCode("NOT_FOUND")
+                .Build());
+
+        rolePolicy.ExpiresAt = expiresAt is not null
+            ? DateTime.Parse(expiresAt, null, System.Globalization.DateTimeStyles.RoundtripKind)
+            : null;
+
+        if (reason is not null)
+            rolePolicy.Reason = reason;
+
+        await db.SaveChangesAsync();
         return true;
     }
 

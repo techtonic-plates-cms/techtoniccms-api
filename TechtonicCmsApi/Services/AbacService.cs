@@ -397,23 +397,23 @@ public class AbacService
             return false;
 
         var actualStr = actualValue.ToString() ?? "";
-        var expected = rule.ExpectedValue;
 
         return rule.Operator switch
         {
-            OperatorType.Eq => EvaluateEquals(actualStr, expected, rule.ValueType),
-            OperatorType.Ne => !EvaluateEquals(actualStr, expected, rule.ValueType),
-            OperatorType.In => EvaluateIn(actualStr, expected),
-            OperatorType.NotIn => !EvaluateIn(actualStr, expected),
-            OperatorType.Gt => EvaluateComparison(actualStr, expected, rule.ValueType) > 0,
-            OperatorType.Gte => EvaluateComparison(actualStr, expected, rule.ValueType) >= 0,
-            OperatorType.Lt => EvaluateComparison(actualStr, expected, rule.ValueType) < 0,
-            OperatorType.Lte => EvaluateComparison(actualStr, expected, rule.ValueType) <= 0,
-            OperatorType.Contains => actualStr.Contains(expected, StringComparison.OrdinalIgnoreCase),
-            OperatorType.StartsWith => actualStr.StartsWith(expected, StringComparison.OrdinalIgnoreCase),
-            OperatorType.EndsWith => actualStr.EndsWith(expected, StringComparison.OrdinalIgnoreCase),
-            OperatorType.Regex => Regex.IsMatch(actualStr, expected, RegexOptions.None, TimeSpan.FromSeconds(1)),
-            OperatorType.EqContextRef => context.TryGetValue(expected, out var refVal)
+            OperatorType.Eq => EvaluateEquals(rule, actualValue),
+            OperatorType.Ne => !EvaluateEquals(rule, actualValue),
+            OperatorType.In => rule.ExpectedArrayValue?.Contains(actualStr, StringComparer.OrdinalIgnoreCase) ?? false,
+            OperatorType.NotIn => !(rule.ExpectedArrayValue?.Contains(actualStr, StringComparer.OrdinalIgnoreCase) ?? false),
+            OperatorType.Gt => EvaluateComparison(rule, actualValue) > 0,
+            OperatorType.Gte => EvaluateComparison(rule, actualValue) >= 0,
+            OperatorType.Lt => EvaluateComparison(rule, actualValue) < 0,
+            OperatorType.Lte => EvaluateComparison(rule, actualValue) <= 0,
+            OperatorType.Contains => actualStr.Contains(rule.ExpectedStringValue ?? "", StringComparison.OrdinalIgnoreCase),
+            OperatorType.StartsWith => actualStr.StartsWith(rule.ExpectedStringValue ?? "", StringComparison.OrdinalIgnoreCase),
+            OperatorType.EndsWith => actualStr.EndsWith(rule.ExpectedStringValue ?? "", StringComparison.OrdinalIgnoreCase),
+            OperatorType.Regex => Regex.IsMatch(actualStr, rule.ExpectedStringValue ?? "", RegexOptions.None, TimeSpan.FromSeconds(1)),
+            OperatorType.EqContextRef => rule.ContextReferencePath.HasValue
+                && context.TryGetValue(rule.ContextReferencePath.Value.ToString(), out var refVal)
                 && string.Equals(actualStr, refVal?.ToString() ?? "", StringComparison.OrdinalIgnoreCase),
             _ => false
         };
@@ -465,53 +465,47 @@ public class AbacService
         return context;
     }
 
-    private static bool EvaluateEquals(string actual, string expected, ValueType valueType)
+    private static bool EvaluateEquals(AbacPolicyRule rule, object? actualValue)
     {
-        return valueType switch
+        if (actualValue == null) return false;
+
+        return rule.ValueType switch
         {
-            ValueType.Number => double.TryParse(actual, CultureInfo.InvariantCulture, out var aNum)
-                && double.TryParse(expected, CultureInfo.InvariantCulture, out var eNum)
-                && Math.Abs(aNum - eNum) < double.Epsilon,
-            ValueType.Boolean => string.Equals(actual, expected, StringComparison.OrdinalIgnoreCase),
-            ValueType.Uuid => string.Equals(actual, expected, StringComparison.OrdinalIgnoreCase),
-            ValueType.Datetime => DateTime.TryParse(actual, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var aDt)
-                && DateTime.TryParse(expected, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var eDt)
-                && aDt == eDt,
-            _ => string.Equals(actual, expected, StringComparison.Ordinal)
+            ValueType.String => string.Equals(actualValue.ToString(), rule.ExpectedStringValue, StringComparison.Ordinal),
+            ValueType.Number => double.TryParse(actualValue.ToString(), CultureInfo.InvariantCulture, out var aNum)
+                && rule.ExpectedNumberValue.HasValue
+                && Math.Abs(aNum - rule.ExpectedNumberValue.Value) < double.Epsilon,
+            ValueType.Boolean => bool.TryParse(actualValue.ToString(), out var aBool)
+                && rule.ExpectedBooleanValue.HasValue
+                && aBool == rule.ExpectedBooleanValue.Value,
+            ValueType.Uuid => Guid.TryParse(actualValue.ToString(), out var aGuid)
+                && rule.ExpectedUuidValue.HasValue
+                && aGuid == rule.ExpectedUuidValue.Value,
+            ValueType.Datetime => DateTime.TryParse(actualValue.ToString(), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var aDt)
+                && rule.ExpectedDateTimeValue.HasValue
+                && aDt == rule.ExpectedDateTimeValue.Value,
+            _ => false
         };
     }
 
-    private static bool EvaluateIn(string actual, string expectedArray)
+    private static int EvaluateComparison(AbacPolicyRule rule, object? actualValue)
     {
-        try
-        {
-            var items = JsonSerializer.Deserialize<string[]>(expectedArray);
-            return items != null && items.Contains(actual, StringComparer.OrdinalIgnoreCase);
-        }
-        catch
-        {
-            return false;
-        }
-    }
+        if (actualValue == null) return 0;
 
-    private static int EvaluateComparison(string actual, string expected, ValueType valueType)
-    {
-        if (valueType == ValueType.Number)
+        if (rule.ValueType == ValueType.Number && rule.ExpectedNumberValue.HasValue)
         {
-            if (double.TryParse(actual, CultureInfo.InvariantCulture, out var aNum)
-                && double.TryParse(expected, CultureInfo.InvariantCulture, out var eNum))
-                return aNum.CompareTo(eNum);
+            if (double.TryParse(actualValue.ToString(), CultureInfo.InvariantCulture, out var aNum))
+                return aNum.CompareTo(rule.ExpectedNumberValue.Value);
             return 0;
         }
 
-        if (valueType == ValueType.Datetime)
+        if (rule.ValueType == ValueType.Datetime && rule.ExpectedDateTimeValue.HasValue)
         {
-            if (DateTime.TryParse(actual, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var aDt)
-                && DateTime.TryParse(expected, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var eDt))
-                return DateTime.Compare(aDt, eDt);
+            if (DateTime.TryParse(actualValue.ToString(), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var aDt))
+                return DateTime.Compare(aDt, rule.ExpectedDateTimeValue.Value);
             return 0;
         }
 
-        return string.Compare(actual, expected, StringComparison.Ordinal);
+        return string.Compare(actualValue.ToString(), rule.ExpectedStringValue, StringComparison.Ordinal);
     }
 }

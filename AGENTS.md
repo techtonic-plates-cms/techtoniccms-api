@@ -102,10 +102,10 @@ Implemented in [Services/AbacService.cs](TechtonicCmsApi/Services/AbacService.cs
 |-------|---------|
 | `AttributePath` | `SubjectId`, `SubjectRole`, `SubjectStatus`, `ResourceEntryCreatedBy`, `ResourceAssetUploadedBy`, `EnvironmentCurrentTime`, `ActionType`, and more — see [Enums/AttributePath.cs](TechtonicCmsApi/Schema/TechtonicCms/Enums/AttributePath.cs) |
 | `OperatorType` | `Eq`, `Ne`, `In`, `NotIn`, `Gt/Gte/Lt/Lte`, `Contains`, `StartsWith`, `EndsWith`, `Regex`, `IsNull`, `IsNotNull`, `EqContextRef` |
-| `ValueType` | `String`, `Number`, `Boolean`, `Uuid`, `Datetime` |
+| `ValueType` | `String`, `Number`, `Boolean`, `Uuid`, `Datetime`, `Array` |
 | `RuleConnector` | `And` (all rules must match) or `Or` (any rule matches) |
 
-`EqContextRef` is special: `ExpectedValue` is treated as another context key — used for ownership checks like `ResourceEntryCreatedBy == SubjectId`.
+The expected value is stored in typed nullable columns (`ExpectedStringValue`, `ExpectedNumberValue`, `ExpectedBooleanValue`, `ExpectedUuidValue`, `ExpectedDateTimeValue`, `ExpectedArrayValue`) depending on the `ValueType`. `EqContextRef` uses `ContextReferencePath` instead of a literal value.
 
 Every evaluation writes to `AbacAudit` (fire-and-forget, failures silently swallowed). Cache entries also store `PolicyVersions` (a comma-joined `id:updatedAt` string) for future invalidation.
 

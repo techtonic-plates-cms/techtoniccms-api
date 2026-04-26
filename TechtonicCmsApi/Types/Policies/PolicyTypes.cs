@@ -71,7 +71,13 @@ public partial class PolicyRuleType : ObjectType<AbacPolicyRule>
         descriptor.Field(r => r.PolicyId).ID().IsProjected();
         descriptor.Field(r => r.AttributePath).IsProjected();
         descriptor.Field(r => r.Operator).IsProjected();
-        descriptor.Field(r => r.ExpectedValue).Type<NonNullType<StringType>>().IsProjected();
+        descriptor.Field(r => r.ExpectedStringValue).IsProjected();
+        descriptor.Field(r => r.ExpectedNumberValue).IsProjected();
+        descriptor.Field(r => r.ExpectedBooleanValue).IsProjected();
+        descriptor.Field(r => r.ExpectedUuidValue).IsProjected();
+        descriptor.Field(r => r.ExpectedDateTimeValue).IsProjected();
+        descriptor.Field(r => r.ExpectedArrayValue).IsProjected();
+        descriptor.Field(r => r.ContextReferencePath).IsProjected();
         descriptor.Field(r => r.ValueType).IsProjected();
         descriptor.Field(r => r.Description).IsProjected();
         descriptor.Field(r => r.IsActive).IsProjected();

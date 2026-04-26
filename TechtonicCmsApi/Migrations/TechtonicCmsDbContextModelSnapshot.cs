@@ -260,6 +260,9 @@ namespace TechtonicCmsApi.Migrations
                     b.Property<int>("AttributePath")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("ContextReferencePath")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -269,9 +272,23 @@ namespace TechtonicCmsApi.Migrations
                         .HasMaxLength(512)
                         .HasColumnType("character varying(512)");
 
-                    b.Property<string>("ExpectedValue")
-                        .IsRequired()
+                    b.PrimitiveCollection<string[]>("ExpectedArrayValue")
+                        .HasColumnType("text[]");
+
+                    b.Property<bool?>("ExpectedBooleanValue")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("ExpectedDateTimeValue")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<double?>("ExpectedNumberValue")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("ExpectedStringValue")
                         .HasColumnType("text");
+
+                    b.Property<Guid?>("ExpectedUuidValue")
+                        .HasColumnType("uuid");
 
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()

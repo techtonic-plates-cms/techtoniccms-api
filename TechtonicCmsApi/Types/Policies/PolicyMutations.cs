@@ -12,6 +12,18 @@ using PolicyEntity = TechtonicCmsApi.Schema.TechtonicCms.Entities.AbacPolicy;
 
 namespace TechtonicCmsApi.Types.Policies;
 
+[OneOf]
+public class PolicyRuleValueInput
+{
+    public string? StringValue { get; set; }
+    public double? NumberValue { get; set; }
+    public bool? BooleanValue { get; set; }
+    public Guid? UuidValue { get; set; }
+    public DateTime? DateTimeValue { get; set; }
+    public string[]? ArrayValue { get; set; }
+    public AttributePath? ContextReferencePath { get; set; }
+}
+
 public class CreatePolicyRuleInput
 {
     [GraphQLType<NonNullType<EnumType<AttributePath>>>]
@@ -20,11 +32,7 @@ public class CreatePolicyRuleInput
     [GraphQLType<NonNullType<EnumType<OperatorType>>>]
     public OperatorType Operator { get; set; }
 
-    [GraphQLType<NonNullType<StringType>>]
-    public string ExpectedValue { get; set; } = "";
-
-    [GraphQLType<NonNullType<EnumType<Schema.TechtonicCms.Enums.ValueType>>>]
-    public Schema.TechtonicCms.Enums.ValueType ValueType { get; set; }
+    public PolicyRuleValueInput? Value { get; set; }
 
     public string? Description { get; set; }
 
@@ -69,11 +77,7 @@ public class UpdatePolicyRuleInput
     [GraphQLType<NonNullType<EnumType<OperatorType>>>]
     public OperatorType Operator { get; set; }
 
-    [GraphQLType<NonNullType<StringType>>]
-    public string ExpectedValue { get; set; } = "";
-
-    [GraphQLType<NonNullType<EnumType<Schema.TechtonicCms.Enums.ValueType>>>]
-    public Schema.TechtonicCms.Enums.ValueType ValueType { get; set; }
+    public PolicyRuleValueInput? Value { get; set; }
 
     public string? Description { get; set; }
 
@@ -146,14 +150,13 @@ public class PolicyMutation
                     PolicyId = policy.Id,
                     AttributePath = ruleInput.AttributePath,
                     Operator = ruleInput.Operator,
-                    ExpectedValue = ruleInput.ExpectedValue,
-                    ValueType = ruleInput.ValueType,
                     Description = ruleInput.Description,
                     IsActive = ruleInput.IsActive ?? true,
                     Order = ruleInput.Order ?? i,
                     CreatedAt = now
                 };
 
+                ApplyRuleValue(rule, ruleInput.Value, ruleInput.Operator);
                 db.AbacPolicyRules.Add(rule);
             }
 
@@ -233,11 +236,10 @@ public class PolicyMutation
                     {
                         existingRule.AttributePath = ruleInput.AttributePath;
                         existingRule.Operator = ruleInput.Operator;
-                        existingRule.ExpectedValue = ruleInput.ExpectedValue;
-                        existingRule.ValueType = ruleInput.ValueType;
                         existingRule.Description = ruleInput.Description;
                         existingRule.IsActive = ruleInput.IsActive ?? true;
                         existingRule.Order = ruleInput.Order ?? 0;
+                        ApplyRuleValue(existingRule, ruleInput.Value, ruleInput.Operator);
                     }
                 }
                 else
@@ -248,14 +250,13 @@ public class PolicyMutation
                         PolicyId = policy.Id,
                         AttributePath = ruleInput.AttributePath,
                         Operator = ruleInput.Operator,
-                        ExpectedValue = ruleInput.ExpectedValue,
-                        ValueType = ruleInput.ValueType,
                         Description = ruleInput.Description,
                         IsActive = ruleInput.IsActive ?? true,
                         Order = ruleInput.Order ?? 0,
                         CreatedAt = DateTime.UtcNow
                     };
 
+                    ApplyRuleValue(newRule, ruleInput.Value, ruleInput.Operator);
                     db.AbacPolicyRules.Add(newRule);
                 }
             }
@@ -279,6 +280,105 @@ public class PolicyMutation
         }
 
         return true;
+    }
+
+    private static void ApplyRuleValue(AbacPolicyRule rule, PolicyRuleValueInput? value, OperatorType op)
+    {
+        rule.ExpectedStringValue = null;
+        rule.ExpectedNumberValue = null;
+        rule.ExpectedBooleanValue = null;
+        rule.ExpectedUuidValue = null;
+        rule.ExpectedDateTimeValue = null;
+        rule.ExpectedArrayValue = null;
+        rule.ContextReferencePath = null;
+
+        if (op == OperatorType.IsNull || op == OperatorType.IsNotNull)
+        {
+            rule.ValueType = Schema.TechtonicCms.Enums.ValueType.String;
+            return;
+        }
+
+        if (value is null)
+        {
+            throw new GraphQLException(ErrorBuilder.New()
+                .SetMessage("Value is required for this operator")
+                .SetCode("BAD_REQUEST")
+                .Build());
+        }
+
+        var (valueType, typedValue, contextRef) = ResolveRuleValue(value);
+
+        if (op == OperatorType.EqContextRef && contextRef is null)
+        {
+            throw new GraphQLException(ErrorBuilder.New()
+                .SetMessage("Operator EqContextRef requires ContextReferencePath")
+                .SetCode("BAD_REQUEST")
+                .Build());
+        }
+
+        if ((op == OperatorType.In || op == OperatorType.NotIn) && typedValue is not string[])
+        {
+            throw new GraphQLException(ErrorBuilder.New()
+                .SetMessage("Operator In/NotIn requires ArrayValue")
+                .SetCode("BAD_REQUEST")
+                .Build());
+        }
+
+        if (op != OperatorType.EqContextRef && op != OperatorType.In && op != OperatorType.NotIn && typedValue is string[])
+        {
+            throw new GraphQLException(ErrorBuilder.New()
+                .SetMessage("ArrayValue is only valid with In/NotIn operators")
+                .SetCode("BAD_REQUEST")
+                .Build());
+        }
+
+        switch (valueType)
+        {
+            case Schema.TechtonicCms.Enums.ValueType.String:
+                rule.ExpectedStringValue = (string?)typedValue;
+                break;
+            case Schema.TechtonicCms.Enums.ValueType.Number:
+                rule.ExpectedNumberValue = (double?)typedValue;
+                break;
+            case Schema.TechtonicCms.Enums.ValueType.Boolean:
+                rule.ExpectedBooleanValue = (bool?)typedValue;
+                break;
+            case Schema.TechtonicCms.Enums.ValueType.Uuid:
+                rule.ExpectedUuidValue = (Guid?)typedValue;
+                break;
+            case Schema.TechtonicCms.Enums.ValueType.Datetime:
+                rule.ExpectedDateTimeValue = (DateTime?)typedValue;
+                break;
+            case Schema.TechtonicCms.Enums.ValueType.Array:
+                rule.ExpectedArrayValue = (string[]?)typedValue;
+                break;
+        }
+
+        rule.ContextReferencePath = contextRef;
+        rule.ValueType = valueType;
+    }
+
+    private static (Schema.TechtonicCms.Enums.ValueType valueType, object? typedValue, AttributePath? contextRef) ResolveRuleValue(PolicyRuleValueInput value)
+    {
+        int populatedCount = 0;
+        Schema.TechtonicCms.Enums.ValueType? derivedType = null;
+        object? typedValue = null;
+        AttributePath? contextRef = null;
+
+        if (value.StringValue is not null)       { populatedCount++; derivedType = Schema.TechtonicCms.Enums.ValueType.String;  typedValue = value.StringValue; }
+        if (value.NumberValue.HasValue)          { populatedCount++; derivedType = Schema.TechtonicCms.Enums.ValueType.Number;  typedValue = value.NumberValue.Value; }
+        if (value.BooleanValue.HasValue)         { populatedCount++; derivedType = Schema.TechtonicCms.Enums.ValueType.Boolean; typedValue = value.BooleanValue.Value; }
+        if (value.UuidValue.HasValue)            { populatedCount++; derivedType = Schema.TechtonicCms.Enums.ValueType.Uuid;    typedValue = value.UuidValue.Value; }
+        if (value.DateTimeValue.HasValue)        { populatedCount++; derivedType = Schema.TechtonicCms.Enums.ValueType.Datetime; typedValue = value.DateTimeValue.Value; }
+        if (value.ArrayValue is not null)        { populatedCount++; derivedType = Schema.TechtonicCms.Enums.ValueType.Array;   typedValue = value.ArrayValue; }
+        if (value.ContextReferencePath.HasValue) { populatedCount++; derivedType = Schema.TechtonicCms.Enums.ValueType.Uuid;    contextRef = value.ContextReferencePath.Value; }
+
+        if (populatedCount != 1)
+            throw new GraphQLException(ErrorBuilder.New()
+                .SetMessage("Exactly one value field must be provided in the rule value input")
+                .SetCode("BAD_REQUEST").Build());
+
+        return (derivedType!.Value, typedValue, contextRef);
     }
 
     private static Guid GetUserId(IHttpContextAccessor httpContextAccessor)

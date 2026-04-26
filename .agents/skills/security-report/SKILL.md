@@ -103,7 +103,7 @@ Load `references/graphql-security-checklist.md` before scoring findings.
    - **Recommendation** — specific fix with file references if applicable
    - **Effort** — Small / Medium / Large
 3. Compute risk score: `(Critical × 10) + (High × 5) + (Medium × 2) + (Low × 1)`
-4. Write the final report to `security-reports/YYYY-MM-DD-security-report.md` (create directory if needed)
+4. Write the final report to `reports/YYYY-MM-DD-security-report.md` (create directory if needed)
 5. Return a concise summary to the parent agent: total findings by severity, top 3 critical/high issues, and report file path.
 
 ## Output Rules

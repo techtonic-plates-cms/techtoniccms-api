@@ -20,9 +20,26 @@ public class AbacPolicyRule
     public required OperatorType Operator { get; set; }
 
     [Column(TypeName = "text")]
-    public required string ExpectedValue { get; set; } = null!;
+    public string? ExpectedStringValue { get; set; }
 
-    public required Enums.ValueType ValueType { get; set; }
+    [Column(TypeName = "double precision")]
+    public double? ExpectedNumberValue { get; set; }
+
+    [Column(TypeName = "boolean")]
+    public bool? ExpectedBooleanValue { get; set; }
+
+    [Column(TypeName = "uuid")]
+    public Guid? ExpectedUuidValue { get; set; }
+
+    [Column(TypeName = "timestamp with time zone")]
+    public DateTime? ExpectedDateTimeValue { get; set; }
+
+    [Column(TypeName = "text[]")]
+    public string[]? ExpectedArrayValue { get; set; }
+
+    public AttributePath? ContextReferencePath { get; set; }
+
+    public Enums.ValueType ValueType { get; set; }
 
     [StringLength(512)]
     public string? Description { get; set; }

@@ -13,8 +13,8 @@ using TechtonicCmsApi.Contexts;
 namespace TechtonicCmsApi.Migrations
 {
     [DbContext(typeof(TechtonicCmsDbContext))]
-    [Migration("20260425193455_AddPoliciesAndRolesToBaseResource")]
-    partial class AddPoliciesAndRolesToBaseResource
+    [Migration("20260426152430_InitialTables")]
+    partial class InitialTables
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -263,6 +263,9 @@ namespace TechtonicCmsApi.Migrations
                     b.Property<int>("AttributePath")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("ContextReferencePath")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -272,9 +275,23 @@ namespace TechtonicCmsApi.Migrations
                         .HasMaxLength(512)
                         .HasColumnType("character varying(512)");
 
-                    b.Property<string>("ExpectedValue")
-                        .IsRequired()
+                    b.PrimitiveCollection<string[]>("ExpectedArrayValue")
+                        .HasColumnType("text[]");
+
+                    b.Property<bool?>("ExpectedBooleanValue")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("ExpectedDateTimeValue")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<double?>("ExpectedNumberValue")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("ExpectedStringValue")
                         .HasColumnType("text");
+
+                    b.Property<Guid?>("ExpectedUuidValue")
+                        .HasColumnType("uuid");
 
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()

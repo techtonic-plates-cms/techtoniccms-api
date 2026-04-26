@@ -150,7 +150,7 @@ builder.Services.AddHttpContextAccessor();
 builder.AddGraphQL()
 .ModifyCostOptions(options =>
 {
-    options.MaxFieldCost = 5000;
+    options.MaxFieldCost = 10000;
     options.MaxTypeCost = 1000;
 })
 .AddMaxExecutionDepthRule(15)

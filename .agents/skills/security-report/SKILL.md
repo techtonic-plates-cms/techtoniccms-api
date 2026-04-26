@@ -67,7 +67,7 @@ Read and analyze:
 - `AbacService.cs` — verify deny-first evaluation, priority sorting, cache TTLs, cache invalidation, audit log handling
 - `AbacAuthorizationHandler.cs` — verify integration with ASP.NET Core authz pipeline
 - `AdminBootstrapService.cs` — verify all `BaseResource` × `PermissionAction` combos have seeded policies
-
+- `AttributePath.cs` — identify all available attributes for policy conditions and ensure they are properly populated in context.
 Cross-check:
 - Every `RequirePermissionAsync` and `CheckPermissionAsync` call passes sufficient `resourceData` for `EqContextRef` rules
 - `SubjectRole`, `SubjectStatus`, `EnvironmentIpAddress` are populated in `BuildContext()` if referenced by policies

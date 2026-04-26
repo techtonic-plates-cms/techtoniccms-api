@@ -180,7 +180,6 @@ public class TechtonicCmsDbContext : DbContext
             e.Property(a => a.Timestamp).HasDefaultValueSql("now()");
 
             e.HasOne(a => a.User).WithMany(u => u.AuditLogs).OnDelete(DeleteBehavior.Restrict);
-            e.HasOne(a => a.Field).WithMany().OnDelete(DeleteBehavior.Restrict);
         });
     }
 

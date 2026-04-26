@@ -59,6 +59,65 @@ namespace TechtonicCmsApi.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "abac_audit",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
+                    UserId = table.Column<Guid>(type: "uuid", nullable: false),
+                    RequestedAction = table.Column<int>(type: "integer", nullable: false),
+                    ResourceType = table.Column<int>(type: "integer", nullable: false),
+                    ResourceId = table.Column<Guid>(type: "uuid", nullable: false),
+                    Decision = table.Column<int>(type: "integer", nullable: false),
+                    EvaluatedPolicyIds = table.Column<Guid[]>(type: "uuid[]", nullable: false),
+                    MatchingPolicyIds = table.Column<Guid[]>(type: "uuid[]", nullable: false),
+                    DecisionReason = table.Column<string>(type: "text", nullable: false),
+                    EvaluationTimeMs = table.Column<int>(type: "integer", nullable: false),
+                    RequestContext = table.Column<string>(type: "text", nullable: false),
+                    IpAddress = table.Column<string>(type: "character varying(45)", maxLength: 45, nullable: true),
+                    UserAgent = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
+                    SessionId = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: true),
+                    Timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_abac_audit", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_abac_audit_users_UserId",
+                        column: x => x.UserId,
+                        principalTable: "users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "abac_evaluation_cache",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
+                    UserId = table.Column<Guid>(type: "uuid", nullable: false),
+                    ResourceType = table.Column<int>(type: "integer", nullable: false),
+                    ResourceId = table.Column<Guid>(type: "uuid", nullable: false),
+                    ActionType = table.Column<int>(type: "integer", nullable: false),
+                    Decision = table.Column<int>(type: "integer", nullable: false),
+                    MatchingPolicyIds = table.Column<Guid[]>(type: "uuid[]", nullable: false),
+                    EvaluationTimeMs = table.Column<int>(type: "integer", nullable: false),
+                    ComputedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
+                    ExpiresAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    ContextChecksum = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
+                    PolicyVersions = table.Column<string>(type: "text", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_abac_evaluation_cache", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_abac_evaluation_cache_users_UserId",
+                        column: x => x.UserId,
+                        principalTable: "users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "abac_policies",
                 columns: table => new
                 {
@@ -435,78 +494,6 @@ namespace TechtonicCmsApi.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "abac_audit",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
-                    UserId = table.Column<Guid>(type: "uuid", nullable: false),
-                    RequestedAction = table.Column<int>(type: "integer", nullable: false),
-                    ResourceType = table.Column<int>(type: "integer", nullable: false),
-                    ResourceId = table.Column<Guid>(type: "uuid", nullable: false),
-                    FieldId = table.Column<Guid>(type: "uuid", nullable: true),
-                    Decision = table.Column<int>(type: "integer", nullable: false),
-                    EvaluatedPolicyIds = table.Column<Guid[]>(type: "uuid[]", nullable: false),
-                    MatchingPolicyIds = table.Column<Guid[]>(type: "uuid[]", nullable: false),
-                    DecisionReason = table.Column<string>(type: "text", nullable: false),
-                    EvaluationTimeMs = table.Column<int>(type: "integer", nullable: false),
-                    RequestContext = table.Column<string>(type: "text", nullable: false),
-                    IpAddress = table.Column<string>(type: "character varying(45)", maxLength: 45, nullable: true),
-                    UserAgent = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
-                    SessionId = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: true),
-                    Timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_abac_audit", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_abac_audit_fields_FieldId",
-                        column: x => x.FieldId,
-                        principalTable: "fields",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_abac_audit_users_UserId",
-                        column: x => x.UserId,
-                        principalTable: "users",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "abac_evaluation_cache",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
-                    UserId = table.Column<Guid>(type: "uuid", nullable: false),
-                    ResourceType = table.Column<int>(type: "integer", nullable: false),
-                    ResourceId = table.Column<Guid>(type: "uuid", nullable: false),
-                    ActionType = table.Column<int>(type: "integer", nullable: false),
-                    FieldId = table.Column<Guid>(type: "uuid", nullable: true),
-                    Decision = table.Column<int>(type: "integer", nullable: false),
-                    MatchingPolicyIds = table.Column<Guid[]>(type: "uuid[]", nullable: false),
-                    EvaluationTimeMs = table.Column<int>(type: "integer", nullable: false),
-                    ComputedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
-                    ExpiresAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    ContextChecksum = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                    PolicyVersions = table.Column<string>(type: "text", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_abac_evaluation_cache", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_abac_evaluation_cache_fields_FieldId",
-                        column: x => x.FieldId,
-                        principalTable: "fields",
-                        principalColumn: "Id");
-                    table.ForeignKey(
-                        name: "FK_abac_evaluation_cache_users_UserId",
-                        column: x => x.UserId,
-                        principalTable: "users",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "entry_relations",
                 columns: table => new
                 {
@@ -549,11 +536,6 @@ namespace TechtonicCmsApi.Migrations
                 column: "EvaluationTimeMs");
 
             migrationBuilder.CreateIndex(
-                name: "IX_abac_audit_FieldId",
-                table: "abac_audit",
-                column: "FieldId");
-
-            migrationBuilder.CreateIndex(
                 name: "IX_abac_audit_ResourceType_ResourceId_Timestamp",
                 table: "abac_audit",
                 columns: new[] { "ResourceType", "ResourceId", "Timestamp" });
@@ -582,16 +564,6 @@ namespace TechtonicCmsApi.Migrations
                 name: "IX_abac_evaluation_cache_ExpiresAt",
                 table: "abac_evaluation_cache",
                 column: "ExpiresAt");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_abac_evaluation_cache_FieldId",
-                table: "abac_evaluation_cache",
-                column: "FieldId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_abac_evaluation_cache_UserId_FieldId_ActionType",
-                table: "abac_evaluation_cache",
-                columns: new[] { "UserId", "FieldId", "ActionType" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_abac_evaluation_cache_UserId_ResourceType_ResourceId_Action~",

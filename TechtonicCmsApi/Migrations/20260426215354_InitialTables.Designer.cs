@@ -13,7 +13,7 @@ using TechtonicCmsApi.Contexts;
 namespace TechtonicCmsApi.Migrations
 {
     [DbContext(typeof(TechtonicCmsDbContext))]
-    [Migration("20260426211619_InitialTables")]
+    [Migration("20260426215354_InitialTables")]
     partial class InitialTables
     {
         /// <inheritdoc />
@@ -59,9 +59,6 @@ namespace TechtonicCmsApi.Migrations
                     b.Property<int>("EvaluationTimeMs")
                         .HasColumnType("integer");
 
-                    b.Property<Guid?>("FieldId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("IpAddress")
                         .HasMaxLength(45)
                         .HasColumnType("character varying(45)");
@@ -103,8 +100,6 @@ namespace TechtonicCmsApi.Migrations
 
                     b.HasIndex("EvaluationTimeMs");
 
-                    b.HasIndex("FieldId");
-
                     b.HasIndex("Timestamp");
 
                     b.HasIndex("Decision", "Timestamp");
@@ -145,9 +140,6 @@ namespace TechtonicCmsApi.Migrations
                     b.Property<DateTime>("ExpiresAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid?>("FieldId")
-                        .HasColumnType("uuid");
-
                     b.PrimitiveCollection<Guid[]>("MatchingPolicyIds")
                         .IsRequired()
                         .HasColumnType("uuid[]");
@@ -172,10 +164,6 @@ namespace TechtonicCmsApi.Migrations
                     b.HasIndex("Decision");
 
                     b.HasIndex("ExpiresAt");
-
-                    b.HasIndex("FieldId");
-
-                    b.HasIndex("UserId", "FieldId", "ActionType");
 
                     b.HasIndex("UserId", "ResourceType", "ResourceId", "ActionType");
 
@@ -937,35 +925,22 @@ namespace TechtonicCmsApi.Migrations
 
             modelBuilder.Entity("TechtonicCmsApi.Schema.TechtonicCms.Entities.AbacAudit", b =>
                 {
-                    b.HasOne("TechtonicCmsApi.Schema.TechtonicCms.Entities.Field", "Field")
-                        .WithMany()
-                        .HasForeignKey("FieldId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.HasOne("TechtonicCmsApi.Schema.TechtonicCms.Entities.User", "User")
                         .WithMany("AuditLogs")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.Navigation("Field");
-
                     b.Navigation("User");
                 });
 
             modelBuilder.Entity("TechtonicCmsApi.Schema.TechtonicCms.Entities.AbacEvaluationCache", b =>
                 {
-                    b.HasOne("TechtonicCmsApi.Schema.TechtonicCms.Entities.Field", "Field")
-                        .WithMany()
-                        .HasForeignKey("FieldId");
-
                     b.HasOne("TechtonicCmsApi.Schema.TechtonicCms.Entities.User", "User")
                         .WithMany("EvaluationCaches")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("Field");
 
                     b.Navigation("User");
                 });

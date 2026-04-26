@@ -7,7 +7,6 @@ namespace TechtonicCmsApi.Schema.TechtonicCms.Entities;
 
 [Table("abac_evaluation_cache")]
 [Index(nameof(UserId), nameof(ResourceType), nameof(ResourceId), nameof(ActionType))]
-[Index(nameof(UserId), nameof(FieldId), nameof(ActionType))]
 [Index(nameof(ExpiresAt))]
 [Index(nameof(ContextChecksum))]
 [Index(nameof(Decision))]
@@ -21,7 +20,7 @@ public class AbacEvaluationCache
     public required BaseResource ResourceType { get; set; }
     public required Guid ResourceId { get; set; }
     public required PermissionAction ActionType { get; set; }
-    public Guid? FieldId { get; set; }
+
     public required PermissionEffect Decision { get; set; }
     public required Guid[] MatchingPolicyIds { get; set; } = [];
     public required int EvaluationTimeMs { get; set; }
@@ -35,5 +34,4 @@ public class AbacEvaluationCache
     public required string PolicyVersions { get; set; } = null!;
 
     public User User { get; set; } = null!;
-    public Field? Field { get; set; }
 }

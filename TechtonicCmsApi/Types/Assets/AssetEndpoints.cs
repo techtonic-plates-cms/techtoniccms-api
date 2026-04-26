@@ -120,7 +120,7 @@ public static class AssetEndpoints
                     userId.Value,
                     BaseResource.Assets,
                     PermissionAction.Download,
-                    new() { { "OwnerId", asset.UploadedBy } });
+                    new() { { "ResourceAssetUploadedBy", asset.UploadedBy } });
 
                 if (!allowed)
                     return Results.Forbid();

@@ -24,7 +24,6 @@ class AuditType : ObjectType<AbacAudit>
         descriptor.Field(a => a.SessionId).IsProjected();
 
         descriptor.Field(a => a.User);
-        descriptor.Field(a => a.Field);
         descriptor.Field(a => a.EvaluatedPolicyIds).Type<ListType<NonNullType<UuidType>>>().IsProjected();
         descriptor.Field(a => a.MatchingPolicyIds).Type<ListType<NonNullType<UuidType>>>().IsProjected();
     }

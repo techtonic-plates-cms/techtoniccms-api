@@ -21,7 +21,7 @@ public class AbacAudit
     public required PermissionAction RequestedAction { get; set; }
     public required BaseResource ResourceType { get; set; }
     public required Guid ResourceId { get; set; }
-    public Guid? FieldId { get; set; }
+
     public required PermissionEffect Decision { get; set; }
     public required Guid[] EvaluatedPolicyIds { get; set; } = [];
     public required Guid[] MatchingPolicyIds { get; set; } = [];
@@ -46,5 +46,4 @@ public class AbacAudit
     public required DateTime Timestamp { get; set; }
 
     public User User { get; set; } = null!;
-    public Field? Field { get; set; }
 }

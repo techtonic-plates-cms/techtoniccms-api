@@ -37,14 +37,13 @@ public class AbacService
         Guid userId,
         BaseResource resourceType,
         PermissionAction action,
-        Dictionary<string, object?>? resourceData = null,
-        Guid? fieldId = null)
+        Dictionary<string, object?>? resourceData = null)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
         // ── Try cache lookup first ────────────────────────────────
         var resourceId = ResolveResourceId(resourceType, resourceData);
-        var cached = await LookupCacheAsync(userId, resourceType, resourceId, action, fieldId);
+        var cached = await LookupCacheAsync(userId, resourceType, resourceId, action);
         if (cached != null)
             return cached.Value;
 
@@ -54,7 +53,7 @@ public class AbacService
         if (policies.Count == 0)
         {
             stopwatch.Stop();
-            await WriteAuditAsync(userId, resourceType, resourceId, action, fieldId,
+            await WriteAuditAsync(userId, resourceType, resourceId, action,
                 PermissionEffect.Deny, [], [], "No policies assigned to user",
                 stopwatch.ElapsedMilliseconds, resourceData);
             return false;
@@ -82,11 +81,11 @@ public class AbacService
                 stopwatch.Stop();
 
                 var decision = PermissionEffect.Deny;
-                await WriteAuditAsync(userId, resourceType, resourceId, action, fieldId,
+                await WriteAuditAsync(userId, resourceType, resourceId, action,
                     decision, evaluatedPolicyIds, matchingPolicyIds.ToArray(),
                     $"Denied by policy '{policy.Name}' (priority {policy.Priority})",
                     stopwatch.ElapsedMilliseconds, resourceData);
-                await WriteCacheAsync(userId, resourceType, resourceId, action, fieldId,
+                await WriteCacheAsync(userId, resourceType, resourceId, action,
                     decision, matchingPolicyIds.ToArray(), stopwatch.ElapsedMilliseconds,
                     policies);
 
@@ -102,11 +101,11 @@ public class AbacService
                 stopwatch.Stop();
 
                 var decision = PermissionEffect.Allow;
-                await WriteAuditAsync(userId, resourceType, resourceId, action, fieldId,
+                await WriteAuditAsync(userId, resourceType, resourceId, action,
                     decision, evaluatedPolicyIds, matchingPolicyIds.ToArray(),
                     $"Allowed by policy '{policy.Name}' (priority {policy.Priority})",
                     stopwatch.ElapsedMilliseconds, resourceData);
-                await WriteCacheAsync(userId, resourceType, resourceId, action, fieldId,
+                await WriteCacheAsync(userId, resourceType, resourceId, action,
                     decision, matchingPolicyIds.ToArray(), stopwatch.ElapsedMilliseconds,
                     policies);
 
@@ -115,7 +114,7 @@ public class AbacService
         }
 
         stopwatch.Stop();
-        await WriteAuditAsync(userId, resourceType, resourceId, action, fieldId,
+        await WriteAuditAsync(userId, resourceType, resourceId, action,
             PermissionEffect.Deny, evaluatedPolicyIds, [],
             "No matching allow policy found", stopwatch.ElapsedMilliseconds, resourceData);
 
@@ -191,8 +190,7 @@ public class AbacService
         Guid userId,
         BaseResource resourceType,
         Guid resourceId,
-        PermissionAction action,
-        Guid? fieldId)
+        PermissionAction action)
     {
         IQueryable<AbacEvaluationCache> query = _db.AbacEvaluationCaches
             .Where(c => c.UserId == userId
@@ -200,11 +198,6 @@ public class AbacService
                 && c.ResourceId == resourceId
                 && c.ActionType == action
                 && c.ExpiresAt > DateTime.UtcNow);
-
-        if (fieldId.HasValue)
-            query = query.Where(c => c.FieldId == fieldId);
-        else
-            query = query.Where(c => c.FieldId == null);
 
         var cached = await query.FirstOrDefaultAsync();
         if (cached is null)
@@ -231,7 +224,6 @@ public class AbacService
         BaseResource resourceType,
         Guid resourceId,
         PermissionAction action,
-        Guid? fieldId,
         PermissionEffect decision,
         Guid[] evaluatedPolicyIds,
         Guid[] matchingPolicyIds,
@@ -248,7 +240,6 @@ public class AbacService
                 ResourceType = resourceType,
                 ResourceId = resourceId,
                 RequestedAction = action,
-                FieldId = fieldId,
                 Decision = decision,
                 EvaluatedPolicyIds = evaluatedPolicyIds,
                 MatchingPolicyIds = matchingPolicyIds,
@@ -275,7 +266,6 @@ public class AbacService
         BaseResource resourceType,
         Guid resourceId,
         PermissionAction action,
-        Guid? fieldId,
         PermissionEffect decision,
         Guid[] matchingPolicyIds,
         long evaluationTimeMs,
@@ -290,10 +280,7 @@ public class AbacService
                     && c.ResourceId == resourceId
                     && c.ActionType == action);
 
-            if (fieldId.HasValue)
-                existingQuery = existingQuery.Where(c => c.FieldId == fieldId);
-            else
-                existingQuery = existingQuery.Where(c => c.FieldId == null);
+           
 
             var existing = await existingQuery.FirstOrDefaultAsync();
             if (existing != null)
@@ -303,7 +290,7 @@ public class AbacService
             var now = DateTime.UtcNow;
 
             var contextChecksum = ComputeContextChecksum(
-                userId, resourceType, resourceId, action, fieldId);
+                userId, resourceType, resourceId, action);
             var policyVersions = string.Join(",",
                 evaluatedPolicies.Select(p => $"{p.Id}:{p.UpdatedAt:O}"));
 
@@ -314,7 +301,6 @@ public class AbacService
                 ResourceType = resourceType,
                 ResourceId = resourceId,
                 ActionType = action,
-                FieldId = fieldId,
                 Decision = decision,
                 MatchingPolicyIds = matchingPolicyIds,
                 EvaluationTimeMs = (int)evaluationTimeMs,
@@ -339,14 +325,13 @@ public class AbacService
         Guid userId,
         BaseResource resourceType,
         Guid resourceId,
-        PermissionAction action,
-        Guid? fieldId)
+        PermissionAction action)
     {
-        var raw = $"{userId}:{resourceType}:{resourceId}:{action}:{fieldId}";
+        var raw = $"{userId}:{resourceType}:{resourceId}:{action}";
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(raw));
         return Convert.ToHexString(hash);
     }
-
+    
     public async Task RequirePermissionAsync(
         Guid userId,
         BaseResource resourceType,
@@ -448,6 +433,7 @@ public class AbacService
         if (roleNames.Count > 0)
         {
             context["SubjectRole"] = string.Join(",", roleNames);
+            context["SubjectCreatedAt"] = user?.CreationTime.ToString("o");
         }
 
         if (_httpContextAccessor.HttpContext is not null)

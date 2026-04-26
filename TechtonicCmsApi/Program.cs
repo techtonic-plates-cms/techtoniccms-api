@@ -1,5 +1,5 @@
 using System.IdentityModel.Tokens.Jwt;
-
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -108,7 +108,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         {
             OnTokenValidated = async context =>
             {
-                var sessionId = context.Principal?.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+                var sessionId = context.Principal?.FindFirst(JwtRegisteredClaimNames.Sub)?.Value ?? context.Principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
                 if (sessionId is null)
                 {
                     context.Fail("Invalid token: missing session claim");

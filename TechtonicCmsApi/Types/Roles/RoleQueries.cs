@@ -40,21 +40,9 @@ public class RoleQuery
     [UseFiltering]
     [UseSorting]
     public IQueryable<RoleEntity> Roles(
-        string? search,
-        int? limit,
-        int? offset,
         [Service] TechtonicCmsDbContext db)
     {
         IQueryable<RoleEntity> query = db.Roles;
-
-        if (!string.IsNullOrEmpty(search))
-            query = query.Where(r => r.Name.Contains(search));
-
-        if (offset.HasValue)
-            query = query.Skip(offset.Value);
-
-        if (limit.HasValue)
-            query = query.Take(limit.Value);
 
         return query;
     }

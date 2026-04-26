@@ -58,10 +58,6 @@ public class UserQuery
     [UseFiltering]
     [UseSorting]
     public async Task<IQueryable<UserEntity>> Users(
-        string? search,
-        UserStatus? status,
-        int? limit,
-        int? offset,
         [Service] TechtonicCmsDbContext db,
         [Service] AbacService abacService,
         [Service] IHttpContextAccessor httpContextAccessor)
@@ -70,18 +66,6 @@ public class UserQuery
         await abacService.RequirePermissionAsync(userId, BaseResource.Users, PermissionAction.Read);
 
         IQueryable<UserEntity> query = db.Users;
-
-        if (!string.IsNullOrEmpty(search))
-            query = query.Where(u => u.Name.Contains(search));
-
-        if (status.HasValue)
-            query = query.Where(u => u.Status == status.Value);
-
-        if (offset.HasValue)
-            query = query.Skip(offset.Value);
-
-        if (limit.HasValue)
-            query = query.Take(limit.Value);
 
         return query;
     }

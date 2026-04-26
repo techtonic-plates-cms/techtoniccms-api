@@ -41,12 +41,11 @@ public class AssetQuery
     }
 
     [Authorize]
+    [UsePaging(MaxPageSize = 100)]
     [UseProjection]
     [UseFiltering]
     [UseSorting]
     public async Task<IQueryable<Asset>> Assets(
-        int? limit,
-        int? offset,
         [Service] TechtonicCmsDbContext db,
         [Service] AbacService abacService,
         [Service] IHttpContextAccessor httpContextAccessor)
@@ -55,11 +54,6 @@ public class AssetQuery
         await abacService.RequirePermissionAsync(userId, BaseResource.Assets, PermissionAction.Read);
 
         IQueryable<Asset> query = db.Assets.Where(a => a.IsPublic || a.UploadedBy == userId);
-
-        if (offset.HasValue)
-            query = query.Skip(offset.Value);
-        if (limit.HasValue)
-            query = query.Take(limit.Value);
 
         return query;
     }

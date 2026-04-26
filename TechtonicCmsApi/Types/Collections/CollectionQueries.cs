@@ -59,9 +59,6 @@ public class CollectionQuery
     [UseFiltering]
     [UseSorting]
     public async Task<IQueryable<Collection>> CollectionsData(
-        string? search,
-        int? limit,
-        int? offset,
         [Service] TechtonicCmsDbContext db,
         [Service] AbacService abacService,
         [Service] IHttpContextAccessor httpContextAccessor)
@@ -70,15 +67,6 @@ public class CollectionQuery
         await abacService.RequirePermissionAsync(userId, BaseResource.Collections, PermissionAction.Read);
 
         IQueryable<Collection> query = db.Collections;
-
-        if (!string.IsNullOrEmpty(search))
-            query = query.Where(c => c.Name.Contains(search) || c.Slug.Contains(search));
-
-        if (offset.HasValue)
-            query = query.Skip(offset.Value);
-
-        if (limit.HasValue)
-            query = query.Take(limit.Value);
 
         return query.OrderBy(c => c.Name);
     }

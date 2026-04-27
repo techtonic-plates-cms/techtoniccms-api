@@ -53,7 +53,7 @@ public class AuthService
         {
             ValidateIssuer = true,
             ValidIssuer = _options.Issuer,
-            ValidateAudience = false,
+            ValidateAudience = true,
             ValidateLifetime = true,
             IssuerSigningKey = _rsaSecurityKey,
             ValidateIssuerSigningKey = true,

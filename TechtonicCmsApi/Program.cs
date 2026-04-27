@@ -98,7 +98,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         {
             ValidateIssuer = true,
             ValidIssuer = issuer,
-            ValidateAudience = false,
+            ValidateAudience = true,
             ValidateLifetime = true,
             IssuerSigningKey = rsaKey,
             ValidateIssuerSigningKey = true,

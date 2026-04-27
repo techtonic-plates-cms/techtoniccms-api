@@ -13,7 +13,7 @@ namespace TechtonicCmsApi.Types.Policies;
 
 public class PolicyQuery
 {
-    [Authorize(Policy = "Users:Read")]
+    [Authorize(Policy = "Policies:Read")]
     public async Task<PolicyEntity?> Policy(
         Guid? id,
         string? name,
@@ -35,7 +35,7 @@ public class PolicyQuery
         return await query.FirstOrDefaultAsync();
     }
 
-    [Authorize(Policy = "Users:Read")]
+    [Authorize(Policy = "Policies:Read")]
       [UsePaging(MaxPageSize = 100)]
     [UseProjection]
     [UseFiltering]

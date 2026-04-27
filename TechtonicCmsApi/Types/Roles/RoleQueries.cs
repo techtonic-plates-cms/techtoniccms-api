@@ -12,7 +12,7 @@ namespace TechtonicCmsApi.Types.Roles;
 
 public class RoleQuery
 {
-    [Authorize(Policy = "Users:Read")]
+    [Authorize(Policy = "Roles:Read")]
     public async Task<RoleEntity?> Role(
         Guid? id,
         string? name,
@@ -34,7 +34,7 @@ public class RoleQuery
         return await query.FirstOrDefaultAsync();
     }
 
-    [Authorize(Policy = "Users:Read")]
+    [Authorize(Policy = "Roles:Read")]
     [UsePaging(MaxPageSize = 100)]
     [UseProjection]
     [UseFiltering]

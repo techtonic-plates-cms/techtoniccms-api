@@ -13,7 +13,12 @@ public static class AdminBootstrapService
         IConfiguration config)
     {
         var adminName = config["Admin:Name"] ?? "admin";
-        var adminPassword = config["Admin:Password"] ?? "admin123";
+        var adminPassword = config["Admin:Password"];
+
+        if (adminPassword is null or "")
+        {
+            throw new InvalidOperationException("Admin password must be provided in configuration under 'Admin:Password'");
+        }
 
         var adminUser = await db.Users.FirstOrDefaultAsync(u => u.Name == adminName);
 

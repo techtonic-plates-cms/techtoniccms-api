@@ -48,6 +48,7 @@ builder.Services.AddOptions<JwtOptions>()
 var rsaPublicKeyPem = builder.Configuration["Jwt:RsaPublicKeyPem"];
 var rsaPrivateKeyPem = builder.Configuration["Jwt:RsaPrivateKeyPem"];
 var issuer = builder.Configuration["Jwt:Issuer"] ?? "techtonic-cms";
+var audience = builder.Configuration["Jwt:Audience"] ?? "techtonic-cms-api";
 
 var rsa = System.Security.Cryptography.RSA.Create();
 if (!string.IsNullOrWhiteSpace(rsaPrivateKeyPem))
@@ -99,6 +100,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateIssuer = true,
             ValidIssuer = issuer,
             ValidateAudience = true,
+            ValidAudience = audience,
             ValidateLifetime = true,
             IssuerSigningKey = rsaKey,
             ValidateIssuerSigningKey = true,

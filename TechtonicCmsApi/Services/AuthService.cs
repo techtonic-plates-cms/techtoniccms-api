@@ -12,6 +12,7 @@ namespace TechtonicCmsApi.Services;
 public class JwtOptions
 {
     public required string Issuer { get; set; } = "techtonic-cms";
+    public required string Audience { get; set; } = "techtonic-cms-api";
     public int AccessTokenTtlMinutes { get; set; } = 15;
     public int RefreshTokenTtlDays { get; set; } = 30;
     public string? RsaPrivateKeyPem { get; set; }
@@ -54,6 +55,7 @@ public class AuthService
             ValidateIssuer = true,
             ValidIssuer = _options.Issuer,
             ValidateAudience = true,
+            ValidAudience = _options.Audience,
             ValidateLifetime = true,
             IssuerSigningKey = _rsaSecurityKey,
             ValidateIssuerSigningKey = true,
@@ -75,6 +77,7 @@ public class AuthService
                 new Claim("userId", userId.ToString()),
                 new Claim("name", userName),
             ]),
+            Audience = _options.Audience,
             Issuer = _options.Issuer,
             IssuedAt = now,
             Expires = now.AddMinutes(_options.AccessTokenTtlMinutes),
@@ -100,6 +103,7 @@ public class AuthService
                 new Claim(JwtRegisteredClaimNames.Sub, refreshTokenId),
                 new Claim("type", "refresh"),
             ]),
+            Audience = _options.Audience,
             Issuer = _options.Issuer,
             IssuedAt = now,
             Expires = now.AddDays(_options.RefreshTokenTtlDays),
@@ -130,7 +134,7 @@ public class AuthService
         return principal;
     }
 
-        public ClaimsPrincipal ValidateRefreshToken(string token)
+    public ClaimsPrincipal ValidateRefreshToken(string token)
     {
         var handler = new JwtSecurityTokenHandler();
         var principal = handler.ValidateToken(token, _tokenValidationParameters, out var validatedToken);

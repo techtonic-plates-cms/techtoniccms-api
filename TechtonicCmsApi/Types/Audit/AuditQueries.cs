@@ -3,6 +3,7 @@ using HotChocolate.Authorization;
 using TechtonicCmsApi.Contexts;
 using TechtonicCmsApi.Schema.TechtonicCms.Entities;
 using TechtonicCmsApi.Services;
+using TechtonicCmsApi.Types;
 
 public class AuditQuery
 {
@@ -30,6 +31,9 @@ public class AuditQuery
         return audit;
     }
 }
+
+
+[ExtendObjectType(nameof(Query))]
 
 public static class AuditQueries
 {

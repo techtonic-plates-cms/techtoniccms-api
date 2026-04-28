@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using TechtonicCmsApi.Contexts;
 using TechtonicCmsApi.Schema.TechtonicCms;
 using TechtonicCmsApi.Schema.TechtonicCms.Enums;
+using TechtonicCmsApi.Security;
 using TechtonicCmsApi.Services;
 
 using UserEntity = TechtonicCmsApi.Schema.TechtonicCms.Entities.User;
@@ -53,21 +54,15 @@ public class UserQuery
     }
 
     [Authorize]
+    [AbacRequirePermission(BaseResource.Users, PermissionAction.Read)]
     [UsePaging(MaxPageSize = 100)]
-    [UseProjection]
+    [UseAbacRowCheck(BaseResource.Users, PermissionAction.Read)]
     [UseFiltering]
     [UseSorting]
-    public async Task<IQueryable<UserEntity>> Users(
-        [Service] TechtonicCmsDbContext db,
-        [Service] AbacService abacService,
-        [Service] IHttpContextAccessor httpContextAccessor)
+    public IQueryable<UserEntity> Users(
+        [Service] TechtonicCmsDbContext db)
     {
-        var userId = GetUserId(httpContextAccessor);
-        await abacService.RequirePermissionAsync(userId, BaseResource.Users, PermissionAction.Read);
-
-        IQueryable<UserEntity> query = db.Users;
-
-        return query;
+        return db.Users;
     }
 
     private static Guid GetUserId(IHttpContextAccessor httpContextAccessor)

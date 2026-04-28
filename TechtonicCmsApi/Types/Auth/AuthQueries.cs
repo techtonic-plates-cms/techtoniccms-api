@@ -1,4 +1,6 @@
+using HotChocolate;
 using HotChocolate.Authorization;
+using HotChocolate.Types;
 
 using Microsoft.EntityFrameworkCore;
 using TechtonicCmsApi.Contexts;
@@ -20,6 +22,24 @@ public class AuthQuery
             return null;
 
         return await db.Users.FindAsync(userId);
+    }
+
+    [Authorize]
+    [UsePaging(MaxPageSize = 100)]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<Schema.TechtonicCms.Entities.ApiKey> MyKeys(
+        [Service] TechtonicCmsDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var userIdStr = httpContextAccessor.HttpContext?.User.FindFirst("userId")?.Value;
+        if (userIdStr is null || !Guid.TryParse(userIdStr, out var userId))
+            throw new GraphQLException(ErrorBuilder.New()
+                .SetMessage("Authentication required")
+                .SetCode("UNAUTHENTICATED")
+                .Build());
+
+        return db.ApiKeys.Where(a => a.UserId == userId);
     }
 }
 

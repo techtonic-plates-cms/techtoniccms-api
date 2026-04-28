@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using TechtonicCmsApi.Contexts;
 using TechtonicCmsApi.Schema.TechtonicCms.Entities;
 using TechtonicCmsApi.Schema.TechtonicCms.Enums;
+using TechtonicCmsApi.Security;
 using TechtonicCmsApi.Services;
 
 namespace TechtonicCmsApi.Types.Collections;
@@ -53,22 +54,17 @@ public class CollectionQuery
         return collection;
     }
 
-    [Authorize(Policy = "Collections:Read")]
+    [Authorize]
+    [AbacRequirePermission(BaseResource.Collections, PermissionAction.Read)]
     [UsePaging(MaxPageSize = 100)]
+    [UseAbacRowCheck(BaseResource.Collections, PermissionAction.Read)]
     [UseProjection]
     [UseFiltering]
     [UseSorting]
-    public async Task<IQueryable<Collection>> CollectionsData(
-        [Service] TechtonicCmsDbContext db,
-        [Service] AbacService abacService,
-        [Service] IHttpContextAccessor httpContextAccessor)
+    public IQueryable<Collection> CollectionsData(
+        [Service] TechtonicCmsDbContext db)
     {
-        var userId = GetUserId(httpContextAccessor);
-        await abacService.RequirePermissionAsync(userId, BaseResource.Collections, PermissionAction.Read);
-
-        IQueryable<Collection> query = db.Collections;
-
-        return query.OrderBy(c => c.Name);
+        return db.Collections.OrderBy(c => c.Name);
     }
 
     private static Guid GetUserId(IHttpContextAccessor httpContextAccessor)

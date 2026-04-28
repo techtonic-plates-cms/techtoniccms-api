@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using TechtonicCmsApi.Contexts;
 using TechtonicCmsApi.Schema.TechtonicCms.Entities;
 using TechtonicCmsApi.Schema.TechtonicCms.Enums;
+using TechtonicCmsApi.Security;
 using TechtonicCmsApi.Services;
 using TechtonicCmsApi.Types.Collections.DynamicCollections;
 
@@ -135,16 +136,15 @@ public class UpdateCollectionInput
 }
 public class CollectionMutation
 {
-    [Authorize(Policy = "Collections:Create")]
+    [Authorize]
+    [AbacRequirePermission(BaseResource.Collections, PermissionAction.Create)]
     public async Task<Collection> Create(
         CreateCollectionInput input,
         [Service] TechtonicCmsDbContext db,
-        [Service] AbacService abacService,
         [Service] IHttpContextAccessor httpContextAccessor,
         [Service] CollectionTypeModule typeModule)
     {
         var userId = GetUserId(httpContextAccessor);
-        await abacService.RequirePermissionAsync(userId, BaseResource.Collections, PermissionAction.Create);
 
         var slugExists = await db.Collections.AnyAsync(c => c.Slug == input.Slug);
         if (slugExists)

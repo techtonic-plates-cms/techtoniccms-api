@@ -349,6 +349,89 @@ public class AbacService
         }
     }
 
+    public Dictionary<string, object?> ExtractResourceData(object entity, BaseResource resource)
+    {
+        return (entity, resource) switch
+        {
+            (Schema.TechtonicCms.Entities.ApiKey apiKey, BaseResource.ApiKeys) => new Dictionary<string, object?>
+            {
+                ["ResourceFieldId"] = apiKey.Id.ToString(),
+                ["ResourceApiKeyUserId"] = apiKey.UserId.ToString(),
+            },
+            (Schema.TechtonicCms.Entities.User user, BaseResource.Users) => new Dictionary<string, object?>
+            {
+                ["ResourceFieldId"] = user.Id.ToString(),
+                ["ResourceUserId"] = user.Id.ToString(),
+                ["ResourceUserStatus"] = user.Status.ToString(),
+            },
+            (Schema.TechtonicCms.Entities.Asset asset, BaseResource.Assets) => new Dictionary<string, object?>
+            {
+                ["ResourceFieldId"] = asset.Id.ToString(),
+                ["ResourceAssetUploadedBy"] = asset.UploadedBy.ToString(),
+                ["ResourceAssetMimeType"] = asset.MimeType,
+                ["ResourceAssetFileSize"] = asset.FileSize,
+            },
+            (Schema.TechtonicCms.Entities.Collection collection, BaseResource.Collections) => new Dictionary<string, object?>
+            {
+                ["ResourceFieldId"] = collection.Id.ToString(),
+                ["ResourceCollectionId"] = collection.Id.ToString(),
+                ["ResourceCollectionSlug"] = collection.Slug,
+                ["ResourceCollectionCreatedBy"] = collection.CreatedBy.ToString(),
+                ["ResourceCollectionIsLocalized"] = collection.IsLocalized,
+            },
+            _ => new Dictionary<string, object?>()
+        };
+    }
+
+    /// <summary>
+    /// Returns the name of the property that represents ownership for a given resource type.
+    /// </summary>
+    public static string? GetOwnershipPropertyName(BaseResource resource) => resource switch
+    {
+        BaseResource.ApiKeys => "UserId",
+        BaseResource.Assets => "UploadedBy",
+        BaseResource.Collections => "CreatedBy",
+        BaseResource.Users => "Id",
+        _ => null
+    };
+
+    /// <summary>
+    /// Probes whether the user is restricted to accessing only their own resources.
+    /// Returns true if the user would be denied access to a resource owned by someone else.
+    /// </summary>
+    public async Task<bool> IsRestrictedToOwnResourcesAsync(Guid userId, BaseResource resource, PermissionAction action)
+    {
+        var probeContext = CreateProbeContext(resource, Guid.NewGuid());
+        if (probeContext.Count == 0)
+            return false;
+
+        var allowed = await CheckPermissionAsync(userId, resource, action, probeContext);
+        return !allowed;
+    }
+
+    private static Dictionary<string, object?> CreateProbeContext(BaseResource resource, Guid fakeOwnerId)
+    {
+        var fakeOwnerStr = fakeOwnerId.ToString();
+        return resource switch
+        {
+            BaseResource.ApiKeys => new Dictionary<string, object?> { ["ResourceApiKeyUserId"] = fakeOwnerStr },
+            BaseResource.Assets => new Dictionary<string, object?> { ["ResourceAssetUploadedBy"] = fakeOwnerStr },
+            BaseResource.Collections => new Dictionary<string, object?>
+            {
+                ["ResourceCollectionId"] = fakeOwnerStr,
+                ["ResourceCollectionSlug"] = "probe",
+                ["ResourceCollectionCreatedBy"] = fakeOwnerStr,
+                ["ResourceCollectionIsLocalized"] = false,
+            },
+            BaseResource.Users => new Dictionary<string, object?>
+            {
+                ["ResourceUserId"] = fakeOwnerStr,
+                ["ResourceUserStatus"] = "Active",
+            },
+            _ => new Dictionary<string, object?>()
+        };
+    }
+
     private async Task<bool> EvaluatePolicyRulesAsync(
         AbacPolicy policy,
         Dictionary<string, object?> context)

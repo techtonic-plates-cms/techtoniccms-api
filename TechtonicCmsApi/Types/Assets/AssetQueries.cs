@@ -1,11 +1,13 @@
 using HotChocolate;
 using HotChocolate.Authorization;
+using HotChocolate.Types;
 
 using Microsoft.EntityFrameworkCore;
 
 using TechtonicCmsApi.Contexts;
 using TechtonicCmsApi.Schema.TechtonicCms.Entities;
 using TechtonicCmsApi.Schema.TechtonicCms.Enums;
+using TechtonicCmsApi.Security;
 using TechtonicCmsApi.Services;
 
 namespace TechtonicCmsApi.Types.Assets;
@@ -41,17 +43,17 @@ public class AssetQuery
     }
 
     [Authorize]
+    [AbacRequirePermission(BaseResource.Assets, PermissionAction.Read)]
     [UsePaging(MaxPageSize = 100)]
+    [UseAbacRowCheck(BaseResource.Assets, PermissionAction.Read)]
     [UseProjection]
     [UseFiltering]
     [UseSorting]
-    public async Task<IQueryable<Asset>> Assets(
+    public IQueryable<Asset> Assets(
         [Service] TechtonicCmsDbContext db,
-        [Service] AbacService abacService,
         [Service] IHttpContextAccessor httpContextAccessor)
     {
         var userId = GetUserId(httpContextAccessor);
-        await abacService.RequirePermissionAsync(userId, BaseResource.Assets, PermissionAction.Read);
 
         IQueryable<Asset> query = db.Assets.Where(a => a.IsPublic || a.UploadedBy == userId);
 

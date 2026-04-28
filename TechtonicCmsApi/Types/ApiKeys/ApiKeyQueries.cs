@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using TechtonicCmsApi.Contexts;
 using TechtonicCmsApi.Schema.TechtonicCms;
 using TechtonicCmsApi.Schema.TechtonicCms.Enums;
+using TechtonicCmsApi.Security;
 using TechtonicCmsApi.Services;
 
 namespace TechtonicCmsApi.Types.ApiKeys;
@@ -40,23 +41,19 @@ public class ApiKeyQuery
         return apiKey;
     }
 
-    [Authorize("ApiKeys:Read")]
+    [Authorize]
+    [AbacRequirePermission(BaseResource.ApiKeys, PermissionAction.Read)]
     [UsePaging(MaxPageSize = 100)]
-    [UseProjection]
+    [UseAbacRowCheck(BaseResource.ApiKeys, PermissionAction.Read)]
     [UseFiltering]
     [UseSorting]
-    public async Task<IQueryable<Schema.TechtonicCms.Entities.ApiKey>> ApiKeys(
+    public IQueryable<Schema.TechtonicCms.Entities.ApiKey> ApiKeys(
         Guid? userId,
         bool? isActive,
         int? limit,
         int? offset,
-        [Service] TechtonicCmsDbContext db,
-        [Service] AbacService abacService,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] TechtonicCmsDbContext db)
     {
-        var currentUserId = GetUserId(httpContextAccessor);
-        await abacService.RequirePermissionAsync(currentUserId, BaseResource.ApiKeys, PermissionAction.Read);
-
         IQueryable<Schema.TechtonicCms.Entities.ApiKey> query = db.ApiKeys;
 
         if (userId.HasValue)

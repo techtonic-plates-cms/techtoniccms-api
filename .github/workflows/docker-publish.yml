@@ -24,7 +24,7 @@ jobs:
       matrix:
         include:
           - name: thunder-client-app
-            dockerfile: container/Containerfile
+            dockerfile: containers/Containerfile
             suffix: ''
 
     steps:

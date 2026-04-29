@@ -1,0 +1,63 @@
+# Multi-stage production build for TechtonicCmsApi
+# .NET 10 + Hot Chocolate GraphQL + PostgreSQL + Redis + S3
+
+# ------------------------------------------------------------------------------
+# Build stage
+# ------------------------------------------------------------------------------
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+
+# Copy solution and project files first for better layer caching
+COPY techtoniccms-api.sln ./
+COPY TechtonicCmsApi/TechtonicCmsApi.csproj TechtonicCmsApi/
+
+# Restore dependencies
+RUN dotnet restore TechtonicCmsApi/TechtonicCmsApi.csproj
+
+# Copy source code
+COPY TechtonicCmsApi/ TechtonicCmsApi/
+
+# Build and publish in Release mode
+RUN dotnet publish TechtonicCmsApi/TechtonicCmsApi.csproj \
+    -c Release \
+    -o /app/publish \
+    --no-restore \
+    -p:UseAppHost=false
+
+# ------------------------------------------------------------------------------
+# Runtime stage
+# ------------------------------------------------------------------------------
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+
+# Install ca-certificates for HTTPS outgoing connections (S3, etc.)
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN adduser --disabled-password --gecos "" --home "/nonexistent" --shell "/sbin/nologin" \
+    --no-create-home --uid 1654 appuser
+
+WORKDIR /app
+
+# Copy published application
+COPY --from=build /app/publish .
+
+# Set ownership
+RUN chown -R appuser:appuser /app
+
+# Switch to non-root user
+USER appuser
+
+# ASP.NET Core 10+ defaults to port 8080
+EXPOSE 8080
+
+# Production environment
+ENV ASPNETCORE_ENVIRONMENT=Production
+ENV DOTNET_EnableDiagnostics=0
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD ["sh", "-c", "wget --no-verbose --tries=1 --spider http://localhost:8080/graphql || exit 1"]
+
+ENTRYPOINT ["dotnet", "TechtonicCmsApi.dll"]

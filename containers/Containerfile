@@ -35,8 +35,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
-RUN adduser --disabled-password --gecos "" --home "/nonexistent" --shell "/sbin/nologin" \
-    --no-create-home --uid 1654 appuser
+RUN useradd -l -u 1654 -s /sbin/nologin -M appuser
 
 WORKDIR /app
 

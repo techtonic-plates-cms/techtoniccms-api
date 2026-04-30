@@ -177,10 +177,19 @@ public class AbacService
             return fid;
         }
 
-        // Fallback: hash resource type name to get a stable "no specific resource" ID
-        using var md5 = MD5.Create();
-        var hash = md5.ComputeHash(Encoding.UTF8.GetBytes(resourceType.ToString()));
-        return new Guid(hash);
+        // Fallback: deterministic GUID per resource type
+        return resourceType switch
+        {
+            BaseResource.Users        => new Guid("1876dbf2-726d-40a2-ba7e-0e447e61d60e"),
+            BaseResource.Collections  => new Guid("44f93036-ba8f-48d2-b6b3-8fc61bf7e7dc"),
+            BaseResource.Entries      => new Guid("4709788a-6880-4a2d-9f52-0824f352495a"),
+            BaseResource.Assets       => new Guid("1216fcdd-bcef-40f2-ba76-fb90390bb741"),
+            BaseResource.ApiKeys      => new Guid("567057f3-3c8d-43b2-863a-07f1ae0a6216"),
+            BaseResource.Policies     => new Guid("519a35d4-0f1f-49e6-999c-ebb7d3410467"),
+            BaseResource.Roles        => new Guid("8cf36b39-3dff-42a7-bfdc-f0c53772bc0f"),
+            BaseResource.Audits       => new Guid("6e145e4c-54f6-45ff-bd18-16260997f34e"),
+            _ => Guid.Empty
+        };
     }
 
     /// <summary>

@@ -35,7 +35,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
-RUN useradd -l -u 1654 -s /sbin/nologin -M appuser
+RUN useradd -l -u 10001 -s /sbin/nologin -M appuser
 
 WORKDIR /app
 

@@ -13,6 +13,7 @@ using TechtonicCmsApi.Security;
 using TechtonicCmsApi.Services;
 using TechtonicCmsApi.Types.Assets;
 using TechtonicCmsApi.Types.Collections.DynamicCollections;
+using TechtonicCmsApi.Types.Llms;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -189,6 +190,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapAssetEndpoints();
+app.MapLlmsEndpoints();
 
 app.MapGraphQL().RequireRateLimiting("GeneralApi");
 

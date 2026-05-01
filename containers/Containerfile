@@ -31,7 +31,7 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 
 # Install ca-certificates for HTTPS outgoing connections (S3, etc.)
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates \
+    && apt-get install -y --no-install-recommends ca-certificates wget \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
@@ -54,9 +54,6 @@ EXPOSE 8080
 # Production environment
 ENV ASPNETCORE_ENVIRONMENT=Production
 ENV DOTNET_EnableDiagnostics=0
-
-RUN apt update -y
-RUN apt install -y wget
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \

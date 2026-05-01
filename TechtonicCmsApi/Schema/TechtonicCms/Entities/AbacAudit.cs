@@ -17,7 +17,7 @@ public class AbacAudit
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
     public required Guid Id { get; set; }
 
-    public required Guid UserId { get; set; }
+    public Guid? UserId { get; set; }
     public required PermissionAction RequestedAction { get; set; }
     public required BaseResource ResourceType { get; set; }
     public required Guid ResourceId { get; set; }
@@ -45,5 +45,5 @@ public class AbacAudit
 
     public required DateTime Timestamp { get; set; }
 
-    public User User { get; set; } = null!;
+    public User? User { get; set; }
 }

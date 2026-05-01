@@ -179,7 +179,7 @@ public class TechtonicCmsDbContext : DbContext
             e.Property(a => a.Id).HasDefaultValueSql("gen_random_uuid()");
             e.Property(a => a.Timestamp).HasDefaultValueSql("now()");
 
-            e.HasOne(a => a.User).WithMany(u => u.AuditLogs).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(a => a.User).WithMany(u => u.AuditLogs).OnDelete(DeleteBehavior.SetNull);
         });
     }
 

@@ -46,6 +46,7 @@ public class UseAbacRowCheckAttribute : ObjectFieldDescriptorAttribute
                 throw new GraphQLException(ErrorBuilder.New()
                     .SetMessage("Authentication required")
                     .SetCode("UNAUTHENTICATED")
+                    
                     .Build());
 
             // Determine if the user is restricted to their own resources only

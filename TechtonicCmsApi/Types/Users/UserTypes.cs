@@ -69,5 +69,24 @@ public partial class UserType : ObjectType<User>
                     ExpiresAt = ur.ExpiresAt
                 });
         }
+
+        [UseProjection]
+        public IQueryable<ApiKey> GetApiKeys(
+        [Parent] User user,
+        [Service] TechtonicCmsDbContext db)
+        {
+            return db.ApiKeys.Where(k => k.UserId == user.Id);
+        }
+
+        [UseProjection]
+        public IQueryable<AbacPolicy> GetPolicies(
+        [Parent] User user,
+        [Service] TechtonicCmsDbContext db)
+        {
+            return from up in db.UserPolicies 
+                     join p in db.AbacPolicies on up.PolicyId equals p.Id
+                     where up.UserId == user.Id
+                     select p;
+        }   
     }
 }

@@ -79,14 +79,13 @@ public partial class UserType : ObjectType<User>
         }
 
         [UseProjection]
-        public IQueryable<AbacPolicy> GetPolicies(
+        public IQueryable<UserPolicy> GetPolicies(
         [Parent] User user,
         [Service] TechtonicCmsDbContext db)
         {
             return from up in db.UserPolicies 
-                     join p in db.AbacPolicies on up.PolicyId equals p.Id
                      where up.UserId == user.Id
-                     select p;
+                     select up;
         }   
     }
 }

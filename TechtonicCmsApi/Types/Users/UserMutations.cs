@@ -169,6 +169,25 @@ public class UserMutation
             await db.SaveChangesAsync();
         }
 
+        var hasNoRoles = input.Roles?.Ids is not { Length: > 0 }
+            && input.Roles?.Assignments is not { Length: > 0 };
+
+        if (hasNoRoles)
+        {
+            var viewerRole = await db.Roles.FirstOrDefaultAsync(r => r.Name == "viewer");
+            if (viewerRole is not null)
+            {
+                db.UserRoles.Add(new UserRole
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = user.Id,
+                    RoleId = viewerRole.Id,
+                    AssignedAt = DateTime.UtcNow
+                });
+                await db.SaveChangesAsync();
+            }
+        }
+
         if (input.Policies?.Ids is { Length: > 0 })
         {
             foreach (var policyId in input.Policies.Ids)

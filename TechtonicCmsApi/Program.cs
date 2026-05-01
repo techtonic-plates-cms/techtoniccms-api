@@ -181,6 +181,7 @@ using (var scope = app.Services.CreateScope())
     var passwordService = scope.ServiceProvider.GetRequiredService<PasswordService>();
     var config = scope.ServiceProvider.GetRequiredService<IConfiguration>();
     await AdminBootstrapService.SeedAsync(dbContext, passwordService, config);
+    await RoleBootstrapService.SeedAsync(dbContext);
 }
 
 app.UseSecurityHeaders();

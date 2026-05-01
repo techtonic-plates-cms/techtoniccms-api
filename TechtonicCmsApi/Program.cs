@@ -80,7 +80,7 @@ builder.Services.AddRateLimiter(options =>
 
     options.AddFixedWindowLimiter("GeneralApi", opt =>
     {
-        opt.PermitLimit = 100;
+        opt.PermitLimit = 1000;
         opt.Window = TimeSpan.FromMinutes(1);
         opt.QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst;
         opt.QueueLimit = 0;

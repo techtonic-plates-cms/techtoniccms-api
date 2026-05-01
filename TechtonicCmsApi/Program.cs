@@ -192,4 +192,6 @@ app.MapAssetEndpoints();
 
 app.MapGraphQL().RequireRateLimiting("GeneralApi");
 
+app.MapGet("/healthcheck", () => Results.Ok("healthy"));
+
 app.RunWithGraphQLCommands(args);

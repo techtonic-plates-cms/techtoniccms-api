@@ -13,9 +13,8 @@ namespace TechtonicCmsApi.Security;
 
 /// <summary>
 /// Runs after filtering/sorting but before paging executes.
-/// If the user has an ownership-restricting ABAC policy, performs a lightweight
-/// secondary query to verify the filtered result set contains no forbidden rows.
-/// Throws FORBIDDEN if any row would be denied.
+/// If the user has an ownership-restricting ABAC policy, appends an ownership
+/// filter to the query so that only rows the user is allowed to see are returned.
 /// </summary>
 [AttributeUsage(AttributeTargets.Method)]
 public class UseAbacRowCheckAttribute : ObjectFieldDescriptorAttribute
@@ -54,7 +53,7 @@ public class UseAbacRowCheckAttribute : ObjectFieldDescriptorAttribute
             if (!isRestricted)
                 return;
 
-            // Build a forbidden-row check query: ownershipField != currentUserId
+            // Build an ownership filter: ownershipField == currentUserId
             var ownershipProp = AbacService.GetOwnershipPropertyName(Resource);
             if (ownershipProp is null)
                 return;
@@ -63,14 +62,14 @@ public class UseAbacRowCheckAttribute : ObjectFieldDescriptorAttribute
             var param = Expression.Parameter(entityType, "x");
             var property = Expression.Property(param, ownershipProp);
 
-            Expression forbiddenCondition;
+            Expression allowedCondition;
             if (property.Type == typeof(Guid))
             {
-                forbiddenCondition = Expression.NotEqual(property, Expression.Constant(userId));
+                allowedCondition = Expression.Equal(property, Expression.Constant(userId));
             }
             else if (property.Type == typeof(string))
             {
-                forbiddenCondition = Expression.NotEqual(property, Expression.Constant(userId.ToString()));
+                allowedCondition = Expression.Equal(property, Expression.Constant(userId.ToString()));
             }
             else
             {
@@ -78,33 +77,16 @@ public class UseAbacRowCheckAttribute : ObjectFieldDescriptorAttribute
                 return;
             }
 
-            var lambda = Expression.Lambda(forbiddenCondition, param);
+            var lambda = Expression.Lambda(allowedCondition, param);
             var whereMethod = typeof(Queryable).GetMethods()
                 .First(m => m.Name == "Where" && m.GetParameters().Length == 2)
                 .MakeGenericMethod(entityType);
 
-            var forbiddenQuery = whereMethod.Invoke(null, [queryable, lambda]);
-            if (forbiddenQuery is null)
+            var filteredQuery = whereMethod.Invoke(null, [queryable, lambda]);
+            if (filteredQuery is null)
                 return;
 
-            // Execute: filteredQuery.Where(x => x.Owner != userId).Take(1).AnyAsync()
-            var anyMethod = typeof(EntityFrameworkQueryableExtensions)
-                .GetMethods()
-                .First(m => m.Name == "AnyAsync" && m.GetParameters().Length == 2)
-                .MakeGenericMethod(entityType);
-
-            var cancellationToken = ctx.RequestAborted;
-            var task = (Task)anyMethod.Invoke(null, [forbiddenQuery, cancellationToken])!;
-            await task;
-
-            var hasForbidden = (bool)task.GetType().GetProperty("Result")!.GetValue(task)!;
-            if (hasForbidden)
-            {
-                throw new GraphQLException(ErrorBuilder.New()
-                    .SetMessage($"Permission denied: result set contains {Resource} records that violate ABAC policies")
-                    .SetCode("FORBIDDEN")
-                    .Build());
-            }
+            ctx.Result = filteredQuery;
         });
     }
 }

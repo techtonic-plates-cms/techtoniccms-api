@@ -9,55 +9,6 @@ using TechtonicCmsApi.Schema.TechtonicCms.Enums;
 
 namespace TechtonicCmsApi.Types.Policies;
 
-public class RoleAssignmentDto
-{
-    public Guid Id { get; set; }
-    public string Name { get; set; } = "";
-    public DateTime? AssignedAt { get; set; }
-    public DateTime? ExpiresAt { get; set; }
-    public string? Reason { get; set; }
-}
-
-public class UserAssignmentDto
-{
-    public Guid Id { get; set; }
-    public string Name { get; set; } = "";
-    public DateTime? AssignedAt { get; set; }
-    public DateTime? ExpiresAt { get; set; }
-    public string? Reason { get; set; }
-}
-
-public partial class RoleAssignmentType : ObjectType<RoleAssignmentDto>
-{
-    protected override void Configure(IObjectTypeDescriptor<RoleAssignmentDto> descriptor)
-    {
-        descriptor.BindFieldsExplicitly();
-
-        descriptor.Name("RoleAssignment");
-
-        descriptor.Field(a => a.Id).ID().IsProjected();
-        descriptor.Field(a => a.Name).Type<NonNullType<StringType>>().IsProjected();
-        descriptor.Field(a => a.AssignedAt).IsProjected();
-        descriptor.Field(a => a.ExpiresAt).IsProjected();
-        descriptor.Field(a => a.Reason).IsProjected();
-    }
-}
-
-public partial class UserAssignmentType : ObjectType<UserAssignmentDto>
-{
-    protected override void Configure(IObjectTypeDescriptor<UserAssignmentDto> descriptor)
-    {
-        descriptor.BindFieldsExplicitly();
-
-        descriptor.Name("UserAssignment");
-
-        descriptor.Field(a => a.Id).ID().IsProjected();
-        descriptor.Field(a => a.Name).Type<NonNullType<StringType>>().IsProjected();
-        descriptor.Field(a => a.AssignedAt).IsProjected();
-        descriptor.Field(a => a.ExpiresAt).IsProjected();
-        descriptor.Field(a => a.Reason).IsProjected();
-    }
-}
 
 public partial class PolicyRuleType : ObjectType<AbacPolicyRule>
 {
@@ -123,39 +74,23 @@ public partial class PolicyType : ObjectType<AbacPolicy>
         }
 
         [UseProjection]
-        public IQueryable<RoleAssignmentDto> GetAssignedToRoles(
+        public IQueryable<RolePolicy> GetAssignedToRoles(
             [Parent] AbacPolicy policy,
             [Service] TechtonicCmsDbContext db)
         {
             return db.RolePolicies
                 .Include(rp => rp.Role)
-                .Where(rp => rp.PolicyId == policy.Id)
-                .Select(rp => new RoleAssignmentDto
-                {
-                    Id = rp.Role.Id,
-                    Name = rp.Role.Name,
-                    AssignedAt = rp.AssignedAt,
-                    ExpiresAt = rp.ExpiresAt,
-                    Reason = rp.Reason
-                });
+                .Where(rp => rp.PolicyId == policy.Id);
         }
 
         [UseProjection]
-        public IQueryable<UserAssignmentDto> GetAssignedToUsers(
+        public IQueryable<UserPolicy> GetAssignedToUsers(
             [Parent] AbacPolicy policy,
             [Service] TechtonicCmsDbContext db)
         {
             return db.UserPolicies
                 .Include(up => up.User)
-                .Where(up => up.PolicyId == policy.Id)
-                .Select(up => new UserAssignmentDto
-                {
-                    Id = up.User.Id,
-                    Name = up.User.Name,
-                    AssignedAt = up.AssignedAt,
-                    ExpiresAt = up.ExpiresAt,
-                    Reason = up.Reason
-                });
+                .Where(up => up.PolicyId == policy.Id);
         }
     }
 }

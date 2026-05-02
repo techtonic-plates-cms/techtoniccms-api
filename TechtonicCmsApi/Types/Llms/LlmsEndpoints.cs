@@ -1,3 +1,6 @@
+using HotChocolate;
+using HotChocolate.Execution;
+using HotChocolate.Types;
 using Microsoft.EntityFrameworkCore;
 using TechtonicCmsApi.Contexts;
 using TechtonicCmsApi.Schema.TechtonicCms.Entities;
@@ -16,10 +19,14 @@ public static class LlmsEndpoints
 
         app.MapGet("/llms.md", async (
             IDbContextFactory<TechtonicCmsDbContext> dbFactory,
+            IRequestExecutorResolver executorResolver,
             CancellationToken cancellationToken) =>
         {
             var db = await dbFactory.CreateDbContextAsync(cancellationToken);
             await using var _ = db.ConfigureAwait(false);
+
+            var executor = await executorResolver.GetRequestExecutorAsync(cancellationToken: cancellationToken);
+            var schema = executor.Schema;
 
             var collections = await db.Collections
                 .AsNoTracking()
@@ -28,7 +35,7 @@ public static class LlmsEndpoints
                 .OrderBy(c => c.Name)
                 .ToListAsync(cancellationToken);
 
-            var markdown = BuildMarkdown(collections);
+            var markdown = BuildMarkdown(collections, schema);
             return Results.Text(markdown, "text/markdown; charset=utf-8");
         })
         .RequireRateLimiting("GeneralApi");
@@ -36,7 +43,7 @@ public static class LlmsEndpoints
         return app;
     }
 
-    private static string BuildMarkdown(IReadOnlyList<Collection> collections)
+    private static string BuildMarkdown(IReadOnlyList<Collection> collections, ISchema schema)
     {
         var sections = new List<string>
         {
@@ -58,7 +65,7 @@ public static class LlmsEndpoints
             BuildAuthorization(),
             BuildStaticResources(),
             BuildRestEndpoints(),
-            BuildDynamicCollections(collections),
+            BuildDynamicCollections(collections, schema),
         };
 
         return string.Join("\n", sections);
@@ -240,7 +247,7 @@ public static class LlmsEndpoints
             """;
     }
 
-    private static string BuildDynamicCollections(IReadOnlyList<Collection> collections)
+    private static string BuildDynamicCollections(IReadOnlyList<Collection> collections, ISchema schema)
     {
         var lines = new List<string>
         {
@@ -290,22 +297,29 @@ public static class LlmsEndpoints
 
         foreach (var collection in collections)
         {
-            lines.AddRange(BuildCollectionSection(collection));
+            lines.AddRange(BuildCollectionSection(collection, schema));
         }
 
         return string.Join("\n", lines);
     }
 
-    private static IEnumerable<string> BuildCollectionSection(Collection collection)
+    private static IEnumerable<string> BuildCollectionSection(Collection collection, ISchema schema)
     {
         var pascal = DynamicCollectionHelpers.ToPascalCase(collection.Slug);
         var camel = DynamicCollectionHelpers.ToCamelCase(collection.Slug);
-        var entryType = $"{pascal}Entry";
-        var dataType = $"{pascal}EntryData";
-        var createInput = $"{pascal}CreateEntryDataInput";
-        var updateInput = $"{pascal}UpdateEntryDataInput";
-        var filterInput = $"{pascal}EntryFilterInput";
-        var sortInput = $"{pascal}EntrySortInput";
+        var entryTypeName = $"{pascal}Entry";
+        var dataTypeName = $"{pascal}EntryData";
+        var createInputName = $"{pascal}CreateEntryDataInput";
+        var updateInputName = $"{pascal}UpdateEntryDataInput";
+        var filterInputName = $"{pascal}EntryFilterInput";
+        var sortInputName = $"{pascal}EntrySortInput";
+        var mutationsTypeName = $"{pascal}Mutations";
+
+        schema.TryGetType<ObjectType>(entryTypeName, out var entryType);
+        schema.TryGetType<ObjectType>(dataTypeName, out var dataObjType);
+        schema.TryGetType<InputObjectType>(createInputName, out var createInputType);
+        schema.TryGetType<InputObjectType>(updateInputName, out var updateInputType);
+        schema.TryGetType<ObjectType>(mutationsTypeName, out var mutType);
 
         var lines = new List<string>
         {
@@ -343,11 +357,20 @@ public static class LlmsEndpoints
 
             foreach (var field in collection.Fields.OrderBy(f => f.CreatedAt))
             {
-                var gqlType = MapFieldDataType(field);
-                if (field.DataType == FieldDataType.Relation && field.RelatedCollection is not null)
+                string gqlType;
+                if (dataObjType is not null &&
+                    dataObjType.Fields.FirstOrDefault(f => f.Name == field.Name) is { } schemaField)
                 {
-                    var targetPascal = DynamicCollectionHelpers.ToPascalCase(field.RelatedCollection.Slug);
-                    gqlType = $"{targetPascal}Entry";
+                    gqlType = FormatGraphQLType(schemaField.Type);
+                }
+                else
+                {
+                    gqlType = MapFieldDataType(field);
+                    if (field.DataType == FieldDataType.Relation && field.RelatedCollection is not null)
+                    {
+                        var targetPascal = DynamicCollectionHelpers.ToPascalCase(field.RelatedCollection.Slug);
+                        gqlType = $"{targetPascal}Entry";
+                    }
                 }
 
                 var required = field.IsRequired ? "Yes" : "No";
@@ -364,15 +387,56 @@ public static class LlmsEndpoints
 
         lines.Add("**Generated Types**");
         lines.Add("");
-        lines.Add($"- **Entry type:** `{entryType}` — static fields (`id`, `name`, `slug`, `status`, `createdAt`, `updatedAt`, `publishedAt`, `locale`, `defaultLocale`) + `data: {dataType}!`");
-        lines.Add($"- **Data type:** `{dataType}` — one field per field definition above");
-        lines.Add($"- **Create input:** `{createInput}` — required fields marked with `!`");
-        lines.Add($"- **Update input:** `{updateInput}` — all fields optional");
-        lines.Add($"- **Filter input:** `{filterInput}` — scalar filters via JSONB operators");
-        lines.Add($"- **Sort input:** `{sortInput}` — scalar sorts via JSONB operators");
+
+        if (entryType is not null)
+        {
+            var fieldList = string.Join(", ", entryType.Fields.Select(f => $"`{f.Name}`"));
+            lines.Add($"- **Entry type:** `{entryTypeName}` — fields: {fieldList}");
+        }
+        else
+        {
+            lines.Add($"- **Entry type:** `{entryTypeName}` — static fields (`id`, `name`, `slug`, `status`, `createdAt`, `updatedAt`, `publishedAt`) + `data: {dataTypeName}!`");
+        }
+
+        if (dataObjType is not null)
+        {
+            var dataFieldList = string.Join(", ", dataObjType.Fields.Select(f => $"`{f.Name}: {FormatGraphQLType(f.Type)}`"));
+            lines.Add($"- **Data type:** `{dataTypeName}` — fields: {dataFieldList}");
+        }
+        else
+        {
+            lines.Add($"- **Data type:** `{dataTypeName}` — one field per field definition above");
+        }
+
+        if (createInputType is not null)
+        {
+            var createFieldList = string.Join(", ", createInputType.Fields.Select(f => $"`{f.Name}: {FormatGraphQLType(f.Type)}`"));
+            lines.Add($"- **Create input:** `{createInputName}` — fields: {createFieldList}");
+        }
+        else
+        {
+            lines.Add($"- **Create input:** `{createInputName}` — required fields marked with `!`");
+        }
+
+        if (updateInputType is not null)
+        {
+            var updateFieldList = string.Join(", ", updateInputType.Fields.Select(f => $"`{f.Name}: {FormatGraphQLType(f.Type)}`"));
+            lines.Add($"- **Update input:** `{updateInputName}` — fields: {updateFieldList}");
+        }
+        else
+        {
+            lines.Add($"- **Update input:** `{updateInputName}` — all fields optional");
+        }
+
+        lines.Add($"- **Filter input:** `{filterInputName}` — scalar filters via JSONB operators");
+        lines.Add($"- **Sort input:** `{sortInputName}` — scalar sorts via JSONB operators");
         lines.Add("");
 
-        // Build example query data block
+        // Example Query
+        var queryFields = entryType is not null
+            ? entryType.Fields.Select(f => f.Name).ToList()
+            : new List<string> { "id", "name", "slug", "status", "createdAt", "updatedAt", "publishedAt", "data" };
+
         var dataFieldNames = collection.Fields.OrderBy(f => f.CreatedAt).Select(f => f.Name).ToList();
         var dataBlock = dataFieldNames.Count == 0
             ? "                # No custom fields defined"
@@ -386,17 +450,19 @@ public static class LlmsEndpoints
         lines.Add($"    {camel}(first: 10) {{");
         lines.Add("      edges {");
         lines.Add("        node {");
-        lines.Add("          id");
-        lines.Add("          name");
-        lines.Add("          slug");
-        lines.Add("          status");
-        lines.Add("          createdAt");
-        lines.Add("          updatedAt");
-        lines.Add("          publishedAt");
-        lines.Add("          locale");
-        lines.Add("          data {");
-        lines.Add(dataBlock);
-        lines.Add("          }");
+        foreach (var qf in queryFields)
+        {
+            if (qf == "data")
+            {
+                lines.Add("          data {");
+                lines.Add(dataBlock);
+                lines.Add("          }");
+            }
+            else
+            {
+                lines.Add($"          {qf}");
+            }
+        }
         lines.Add("        }");
         lines.Add("      }");
         lines.Add("    }");
@@ -405,26 +471,58 @@ public static class LlmsEndpoints
         lines.Add("```");
         lines.Add("");
 
-        // Build example create mutation
-        var requiredFields = collection.Fields.Where(f => f.IsRequired).OrderBy(f => f.CreatedAt).ToList();
-        var createDataBlock = requiredFields.Count == 0
-            ? "          # All fields are optional on create"
-            : string.Join("\n", requiredFields.Select(f => $"          {f.Name}: <{MapFieldDataType(f)}>"));
-
+        // Example Create Mutation
         lines.Add("**Example Create Mutation**");
         lines.Add("");
         lines.Add("```graphql");
         lines.Add("mutation {");
         lines.Add("  entries {");
         lines.Add($"    {camel} {{");
-        lines.Add("      create(");
-        lines.Add("        name: \"...\",");
-        lines.Add("        slug: \"...\",");
-        lines.Add("        locale: En,");
-        lines.Add("        data: {");
-        lines.Add(createDataBlock);
-        lines.Add("        }");
-        lines.Add("      ) {");
+
+        if (mutType is not null && mutType.Fields.FirstOrDefault(f => f.Name == "create") is { } createField)
+        {
+            lines.Add("      create(");
+            foreach (var arg in createField.Arguments)
+            {
+                if (arg.Name == "data" && UnwrapType(arg.Type) is InputObjectType dataInput)
+                {
+                    lines.Add("        data: {");
+                    foreach (var inputField in dataInput.Fields)
+                    {
+                        lines.Add($"          {inputField.Name}: <{FormatGraphQLType(inputField.Type)}>");
+                    }
+                    lines.Add("        }");
+                }
+                else
+                {
+                    lines.Add($"        {arg.Name}: <{FormatGraphQLType(arg.Type)}>");
+                }
+            }
+            lines.Add("      ) {");
+        }
+        else
+        {
+            lines.Add("      create(");
+            lines.Add("        name: \"...\",");
+            lines.Add("        slug: \"...\",");
+            lines.Add("        locale: En,");
+            lines.Add("        data: {");
+            var requiredFields = collection.Fields.Where(f => f.IsRequired).OrderBy(f => f.CreatedAt).ToList();
+            if (requiredFields.Count == 0)
+            {
+                lines.Add("          # All fields are optional on create");
+            }
+            else
+            {
+                foreach (var field in requiredFields)
+                {
+                    lines.Add($"          {field.Name}: <{MapFieldDataType(field)}>");
+                }
+            }
+            lines.Add("        }");
+            lines.Add("      ) {");
+        }
+
         lines.Add("        id");
         lines.Add("        name");
         lines.Add("        slug");
@@ -436,13 +534,40 @@ public static class LlmsEndpoints
         lines.Add("```");
         lines.Add("");
 
+        // Example Update Mutation
         lines.Add("**Example Update Mutation**");
         lines.Add("");
         lines.Add("```graphql");
         lines.Add("mutation {");
         lines.Add("  entries {");
         lines.Add($"    {camel} {{");
-        lines.Add("      update(id: \"<uuid>\", data: { /* partial fields */ }) {");
+
+        if (mutType is not null && mutType.Fields.FirstOrDefault(f => f.Name == "update") is { } updateField)
+        {
+            lines.Add("      update(");
+            foreach (var arg in updateField.Arguments)
+            {
+                if (arg.Name == "data" && UnwrapType(arg.Type) is InputObjectType dataInput)
+                {
+                    lines.Add("        data: {");
+                    foreach (var inputField in dataInput.Fields)
+                    {
+                        lines.Add($"          {inputField.Name}: <{FormatGraphQLType(inputField.Type)}>");
+                    }
+                    lines.Add("        }");
+                }
+                else
+                {
+                    lines.Add($"        {arg.Name}: <{FormatGraphQLType(arg.Type)}>");
+                }
+            }
+            lines.Add("      ) {");
+        }
+        else
+        {
+            lines.Add("      update(id: \"<uuid>\", data: { /* partial fields */ }) {");
+        }
+
         lines.Add("        id");
         lines.Add("        name");
         lines.Add("      }");
@@ -452,17 +577,34 @@ public static class LlmsEndpoints
         lines.Add("```");
         lines.Add("");
 
+        // Status Transition Mutations
         lines.Add("**Status Transition Mutations**");
         lines.Add("");
         lines.Add("```graphql");
         lines.Add("mutation {");
         lines.Add("  entries {");
         lines.Add($"    {camel} {{");
-        lines.Add("      publish(id: \"<uuid>\") { id status }");
-        lines.Add("      unpublish(id: \"<uuid>\") { id status }");
-        lines.Add("      archive(id: \"<uuid>\") { id status }");
-        lines.Add("      restore(id: \"<uuid>\") { id status }");
-        lines.Add("      delete(id: \"<uuid>\") { id status }");
+
+        if (mutType is not null)
+        {
+            foreach (var mutField in mutType.Fields.Where(f => f.Name != "create" && f.Name != "update"))
+            {
+                var args = mutField.Arguments.Select(a => $"{a.Name}: <{FormatGraphQLType(a.Type)}>");
+                var argStr = string.Join(", ", args);
+                if (!string.IsNullOrEmpty(argStr))
+                    argStr = $"({argStr})";
+                lines.Add($"      {mutField.Name}{argStr} {{ id status }}");
+            }
+        }
+        else
+        {
+            lines.Add("      publish(id: \"<uuid>\") { id status }");
+            lines.Add("      unpublish(id: \"<uuid>\") { id status }");
+            lines.Add("      archive(id: \"<uuid>\") { id status }");
+            lines.Add("      restore(id: \"<uuid>\") { id status }");
+            lines.Add("      delete(id: \"<uuid>\") { id status }");
+        }
+
         lines.Add("    }");
         lines.Add("  }");
         lines.Add("}");
@@ -490,5 +632,21 @@ public static class LlmsEndpoints
             FieldDataType.Object => "String",
             _ => "String"
         };
+    }
+
+    private static string FormatGraphQLType(IType type)
+    {
+        return type switch
+        {
+            NonNullType nonNull => $"{FormatGraphQLType(nonNull.Type)}!",
+            ListType list => $"[{FormatGraphQLType(list.ElementType)}]",
+            INamedType named => named.Name ?? "Unknown",
+            _ => type.ToString() ?? "Unknown"
+        };
+    }
+
+    private static IType UnwrapType(IType type)
+    {
+        return type is NonNullType nonNull ? nonNull.Type! : type;
     }
 }

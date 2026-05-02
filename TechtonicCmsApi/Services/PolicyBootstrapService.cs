@@ -43,6 +43,7 @@ public static class PolicyBootstrapService
             (Name: "assets-delete", Resource: BaseResource.Assets, Action: PermissionAction.Delete),
             (Name: "assets-upload", Resource: BaseResource.Assets, Action: PermissionAction.Upload),
             (Name: "assets-download", Resource: BaseResource.Assets, Action: PermissionAction.Download),
+            (Name: "apikeys-create", Resource: BaseResource.ApiKeys, Action: PermissionAction.Create),
         };
 
         foreach (var (name, resource, action) in genericPolicies)
@@ -132,6 +133,7 @@ public static class PolicyBootstrapService
             (Name: "apikeys-read-by-owner", Action: PermissionAction.Read),
             (Name: "apikeys-update-by-owner", Action: PermissionAction.Update),
             (Name: "apikeys-delete-by-owner", Action: PermissionAction.Delete),
+            
         };
 
         foreach (var (name, action) in apiKeyCreatorPolicies)

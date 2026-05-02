@@ -6,6 +6,8 @@ using Microsoft.EntityFrameworkCore;
 using TechtonicCmsApi.Contexts;
 using TechtonicCmsApi.Schema.TechtonicCms;
 using TechtonicCmsApi.Schema.TechtonicCms.Entities;
+using TechtonicCmsApi.Schema.TechtonicCms.Enums;
+using TechtonicCmsApi.Security;
 
 using RoleEntity = TechtonicCmsApi.Schema.TechtonicCms.Entities.Role;
 
@@ -64,7 +66,8 @@ public class AssignPolicyToRoleInput
 
 public class RoleMutation
 {
-    [Authorize(Policy = "Roles:Create")]
+    [Authorize]
+    [AbacRequirePermission(BaseResource.Roles, PermissionAction.Create)]
     public async Task<RoleEntity> Create(
         CreateRoleInput input,
         [Service] TechtonicCmsDbContext db,
@@ -126,7 +129,8 @@ public class RoleMutation
         return role;
     }
 
-    [Authorize(Policy = "Roles:Update")]
+    [Authorize]
+    [AbacRequirePermission(BaseResource.Roles, PermissionAction.Update)]
     public async Task<RoleEntity> Update(
         UpdateRoleInput input,
         [Service] TechtonicCmsDbContext db)
@@ -150,7 +154,8 @@ public class RoleMutation
         return role;
     }
 
-    [Authorize(Policy = "Roles:Delete")]
+    [Authorize]
+    [AbacRequirePermission(BaseResource.Roles, PermissionAction.Delete)]
     public async Task<bool> Delete(
         Guid id,
         [Service] TechtonicCmsDbContext db)
@@ -171,7 +176,8 @@ public class RoleMutation
         return true;
     }
 
-    [Authorize(Policy = "Roles:Update")]
+    [Authorize]
+    [AbacRequirePermission(BaseResource.Roles, PermissionAction.Update)]
     public async Task<bool> AssignPolicy(
         AssignPolicyToRoleInput input,
         [Service] TechtonicCmsDbContext db,
@@ -220,7 +226,8 @@ public class RoleMutation
         return true;
     }
 
-    [Authorize(Policy = "Roles:Update")]
+    [Authorize]
+    [AbacRequirePermission(BaseResource.Roles, PermissionAction.Update)]
     public async Task<bool> UnassignPolicy(
         Guid roleId,
         Guid policyId,
@@ -238,7 +245,8 @@ public class RoleMutation
         return true;
     }
 
-    [Authorize(Policy = "Roles:Update")]
+    [Authorize]
+    [AbacRequirePermission(BaseResource.Roles, PermissionAction.Update)]
     public async Task<bool> UpdatePolicyExpiration(
         Guid roleId,
         Guid policyId,

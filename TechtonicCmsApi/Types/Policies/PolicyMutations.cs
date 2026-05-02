@@ -7,6 +7,7 @@ using TechtonicCmsApi.Contexts;
 using TechtonicCmsApi.Schema.TechtonicCms;
 using TechtonicCmsApi.Schema.TechtonicCms.Entities;
 using TechtonicCmsApi.Schema.TechtonicCms.Enums;
+using TechtonicCmsApi.Security;
 
 using PolicyEntity = TechtonicCmsApi.Schema.TechtonicCms.Entities.AbacPolicy;
 
@@ -110,7 +111,8 @@ public class UpdatePolicyInput
 
 public class PolicyMutation
 {
-    [Authorize(Policy = "Policies:Create")]
+    [Authorize]
+    [AbacRequirePermission(BaseResource.Policies, PermissionAction.Create)]
     public async Task<PolicyEntity> Create(
         CreatePolicyInput input,
         [Service] TechtonicCmsDbContext db,
@@ -166,7 +168,8 @@ public class PolicyMutation
         return policy;
     }
 
-    [Authorize(Policy = "Policies:Update")]
+    [Authorize]
+    [AbacRequirePermission(BaseResource.Policies, PermissionAction.Update)]
     public async Task<PolicyEntity> Update(
         UpdatePolicyInput input,
         [Service] TechtonicCmsDbContext db)
@@ -267,7 +270,8 @@ public class PolicyMutation
         return policy;
     }
 
-    [Authorize(Policy = "Policies:Delete")]
+    [Authorize]
+    [AbacRequirePermission(BaseResource.Policies, PermissionAction.Delete)]
     public async Task<bool> Delete(
         Guid id,
         [Service] TechtonicCmsDbContext db)

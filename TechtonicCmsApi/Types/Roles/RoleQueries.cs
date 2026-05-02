@@ -5,6 +5,8 @@ using HotChocolate.Types;
 using Microsoft.EntityFrameworkCore;
 using TechtonicCmsApi.Contexts;
 using TechtonicCmsApi.Schema.TechtonicCms;
+using TechtonicCmsApi.Schema.TechtonicCms.Enums;
+using TechtonicCmsApi.Security;
 
 using RoleEntity = TechtonicCmsApi.Schema.TechtonicCms.Entities.Role;
 
@@ -12,7 +14,8 @@ namespace TechtonicCmsApi.Types.Roles;
 
 public class RoleQuery
 {
-    [Authorize(Policy = "Roles:Read")]
+    [Authorize]
+    [AbacRequirePermission(BaseResource.Roles, PermissionAction.Read)]
     public async Task<RoleEntity?> Role(
         Guid? id,
         string? name,
@@ -34,7 +37,8 @@ public class RoleQuery
         return await query.FirstOrDefaultAsync();
     }
 
-    [Authorize(Policy = "Roles:Read")]
+    [Authorize]
+    [AbacRequirePermission(BaseResource.Roles, PermissionAction.Read)]
     [UsePaging(MaxPageSize = 100)]
     [UseProjection]
     [UseFiltering]

@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using TechtonicCmsApi.Contexts;
 using TechtonicCmsApi.Schema.TechtonicCms;
 using TechtonicCmsApi.Schema.TechtonicCms.Enums;
+using TechtonicCmsApi.Security;
 
 using PolicyEntity = TechtonicCmsApi.Schema.TechtonicCms.Entities.AbacPolicy;
 
@@ -13,7 +14,8 @@ namespace TechtonicCmsApi.Types.Policies;
 
 public class PolicyQuery
 {
-    [Authorize(Policy = "Policies:Read")]
+    [Authorize]
+    [AbacRequirePermission(BaseResource.Policies, PermissionAction.Read)]
     public async Task<PolicyEntity?> Policy(
         Guid? id,
         string? name,
@@ -35,8 +37,9 @@ public class PolicyQuery
         return await query.FirstOrDefaultAsync();
     }
 
-    [Authorize(Policy = "Policies:Read")]
-      [UsePaging(MaxPageSize = 100)]
+    [Authorize]
+    [AbacRequirePermission(BaseResource.Policies, PermissionAction.Read)]
+    [UsePaging(MaxPageSize = 100)]
     [UseProjection]
     [UseFiltering]
     [UseSorting]

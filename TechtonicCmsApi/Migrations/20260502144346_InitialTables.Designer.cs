@@ -13,7 +13,7 @@ using TechtonicCmsApi.Contexts;
 namespace TechtonicCmsApi.Migrations
 {
     [DbContext(typeof(TechtonicCmsDbContext))]
-    [Migration("20260502143057_InitialTables")]
+    [Migration("20260502144346_InitialTables")]
     partial class InitialTables
     {
         /// <inheritdoc />

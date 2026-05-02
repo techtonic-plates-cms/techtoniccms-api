@@ -13,7 +13,7 @@ namespace TechtonicCmsApi.Types.ApiKeys;
 
 public class ApiKeyQuery
 {
-    [Authorize("ApiKeys:Read")]
+    [Authorize]
     public async Task<Schema.TechtonicCms.Entities.ApiKey?> ApiKey(
         Guid id,
         [Service] TechtonicCmsDbContext db,

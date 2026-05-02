@@ -39,34 +39,25 @@ public static class RoleBootstrapService
 
         Console.WriteLine("Viewer role created");
 
-        var viewerPermissions = new[]
+        var policyNames = new[]
         {
-            (Resource: BaseResource.Collections, Action: PermissionAction.Read),
-            (Resource: BaseResource.Entries, Action: PermissionAction.Read),
-            (Resource: BaseResource.Assets, Action: PermissionAction.Read),
-            (Resource: BaseResource.Assets, Action: PermissionAction.Download),
+            "collections-read",
+            "entries-read",
+            "assets-read",
+            "assets-download",
         };
 
-        foreach (var (resource, action) in viewerPermissions)
+        foreach (var policyName in policyNames)
         {
-            var policy = new AbacPolicy
+            var policy = await db.AbacPolicies.FirstOrDefaultAsync(p => p.Name == policyName);
+            if (policy is null)
             {
-                Id = Guid.NewGuid(),
-                Name = $"viewer-{resource.ToString().ToLowerInvariant()}-{action.ToString().ToLowerInvariant()}",
-                Description = $"Allow {action.ToString().ToLowerInvariant()} on {resource.ToString().ToLowerInvariant()} for viewers",
-                Effect = PermissionEffect.Allow,
-                Priority = 100,
-                IsActive = true,
-                ResourceType = resource,
-                ActionType = action,
-                RuleConnector = LogicalOperator.And,
-                CreatedBy = createdBy,
-                CreatedAt = now,
-                UpdatedAt = now
-            };
+                Console.WriteLine($"Warning: Policy '{policyName}' not found, skipping assignment to viewer role");
+                continue;
+            }
 
-            db.AbacPolicies.Add(policy);
-            await db.SaveChangesAsync();
+            var alreadyAssigned = await db.RolePolicies.AnyAsync(rp => rp.RoleId == viewerRole.Id && rp.PolicyId == policy.Id);
+            if (alreadyAssigned) continue;
 
             db.RolePolicies.Add(new RolePolicy
             {
@@ -80,7 +71,7 @@ public static class RoleBootstrapService
         }
 
         await db.SaveChangesAsync();
-        Console.WriteLine("Viewer policies created and assigned");
+        Console.WriteLine("Viewer policies assigned");
     }
 
     private static async Task SeedEditorRoleAsync(TechtonicCmsDbContext db, Guid createdBy)
@@ -106,43 +97,39 @@ public static class RoleBootstrapService
 
         Console.WriteLine("Editor role created");
 
-        var editorPermissions = new[]
+        var policyNames = new[]
         {
-            (Resource: BaseResource.Collections, Action: PermissionAction.Read),
-            (Resource: BaseResource.Collections, Action: PermissionAction.Update),
-            (Resource: BaseResource.Entries, Action: PermissionAction.Create),
-            (Resource: BaseResource.Entries, Action: PermissionAction.Read),
-            (Resource: BaseResource.Entries, Action: PermissionAction.Update),
-            (Resource: BaseResource.Entries, Action: PermissionAction.Publish),
-            (Resource: BaseResource.Entries, Action: PermissionAction.Unpublish),
-            (Resource: BaseResource.Entries, Action: PermissionAction.Schedule),
-            (Resource: BaseResource.Entries, Action: PermissionAction.Archive),
-            (Resource: BaseResource.Entries, Action: PermissionAction.Restore),
-            (Resource: BaseResource.Assets, Action: PermissionAction.Read),
-            (Resource: BaseResource.Assets, Action: PermissionAction.Download),
-            (Resource: BaseResource.Assets, Action: PermissionAction.Upload),
+            "users-activate",
+            "users-deactivate",
+            "collections-read",
+            "collections-update",
+            "collections-delete",
+            "collections-manageschema",
+            "entries-create",
+            "entries-read",
+            "entries-update",
+            "entries-delete",
+            "entries-publish",
+            "entries-unpublish",
+            "entries-schedule",
+            "entries-archive",
+            "entries-restore",
+            "assets-read",
+            "assets-download",
+            "assets-upload",
         };
 
-        foreach (var (resource, action) in editorPermissions)
+        foreach (var policyName in policyNames)
         {
-            var policy = new AbacPolicy
+            var policy = await db.AbacPolicies.FirstOrDefaultAsync(p => p.Name == policyName);
+            if (policy is null)
             {
-                Id = Guid.NewGuid(),
-                Name = $"editor-{resource.ToString().ToLowerInvariant()}-{action.ToString().ToLowerInvariant()}",
-                Description = $"Allow {action.ToString().ToLowerInvariant()} on {resource.ToString().ToLowerInvariant()} for editors",
-                Effect = PermissionEffect.Allow,
-                Priority = 100,
-                IsActive = true,
-                ResourceType = resource,
-                ActionType = action,
-                RuleConnector = LogicalOperator.And,
-                CreatedBy = createdBy,
-                CreatedAt = now,
-                UpdatedAt = now
-            };
+                Console.WriteLine($"Warning: Policy '{policyName}' not found, skipping assignment to editor role");
+                continue;
+            }
 
-            db.AbacPolicies.Add(policy);
-            await db.SaveChangesAsync();
+            var alreadyAssigned = await db.RolePolicies.AnyAsync(rp => rp.RoleId == editorRole.Id && rp.PolicyId == policy.Id);
+            if (alreadyAssigned) continue;
 
             db.RolePolicies.Add(new RolePolicy
             {
@@ -156,6 +143,6 @@ public static class RoleBootstrapService
         }
 
         await db.SaveChangesAsync();
-        Console.WriteLine("Editor policies created and assigned");
+        Console.WriteLine("Editor policies assigned");
     }
 }

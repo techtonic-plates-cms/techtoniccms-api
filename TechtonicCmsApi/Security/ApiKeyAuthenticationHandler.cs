@@ -52,7 +52,10 @@ public class ApiKeyAuthenticationHandler : AuthenticationHandler<AuthenticationS
         }
 
         if (apiKey.User.Status != UserStatus.Active)
-            return AuthenticateResult.Fail("User inactive");
+        {
+            var message = apiKey.User.Status == UserStatus.Banned ? "User banned" : "User inactive";
+            return AuthenticateResult.Fail(message);
+        }
 
         apiKey.LastUsedAt = DateTime.UtcNow;
         await db.SaveChangesAsync();

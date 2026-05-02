@@ -18,5 +18,6 @@ public enum PermissionAction
     Deactivate,
     Upload,
     Download,
-    ManageSchema
+    ManageSchema,
+    Wildcard
 }

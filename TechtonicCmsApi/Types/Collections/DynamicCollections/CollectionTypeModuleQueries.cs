@@ -119,9 +119,17 @@ public partial class CollectionTypeModule
 
                 var innerDb = ctx.Service<TechtonicCmsDbContext>();
 
-                return innerDb.Entries
-                    .Where(e => e.CollectionId == collectionId)
-                    .AsQueryable();
+                var query = innerDb.Entries
+                    .Where(e => e.CollectionId == collectionId);
+
+                var isRestricted = await readAbacService.IsRestrictedToOwnResourcesAsync(
+                    readUserId, BaseResource.Entries, PermissionAction.Read);
+                if (isRestricted)
+                {
+                    query = query.Where(e => e.CreatedBy == readUserId);
+                }
+
+                return query.AsQueryable();
             }
         };
         var fieldDescriptor = collectionPropertyDef.ToDescriptor(context)

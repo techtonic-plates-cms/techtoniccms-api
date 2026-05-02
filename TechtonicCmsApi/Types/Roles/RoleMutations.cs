@@ -158,6 +158,12 @@ public class RoleMutation
         var role = await db.Roles.FindAsync(id);
         if (role is not null)
         {
+            if (role.Name == "admin")
+                throw new GraphQLException(ErrorBuilder.New()
+                    .SetMessage("Cannot delete the admin role")
+                    .SetCode("FORBIDDEN")
+                    .Build());
+
             db.Roles.Remove(role);
             await db.SaveChangesAsync();
         }

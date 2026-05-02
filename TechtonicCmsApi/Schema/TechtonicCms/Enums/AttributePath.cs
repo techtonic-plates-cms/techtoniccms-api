@@ -30,6 +30,7 @@ public enum AttributePath
     ResourceUserId,
     ResourceUserStatus,
     ResourceApiKeyUserId,
+    ResourceAuditUserId,
     EnvironmentCurrentTime,
     EnvironmentIpAddress,
     EnvironmentUserAgent,

@@ -12,5 +12,6 @@ public enum BaseResource
     ApiKeys,
     Policies,
     Roles,
-    Audits
+    Audits,
+    Wildcard
 }

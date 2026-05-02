@@ -61,44 +61,46 @@ public static class AdminBootstrapService
             await db.SaveChangesAsync();
 
             Console.WriteLine("Admin role created");
+        }
 
-            foreach (BaseResource resource in Enum.GetValues<BaseResource>())
+        // Seed wildcard *:* policy for admin role (super-admin access)
+        // The admin role only needs this single wildcard policy instead of
+        // individual policies for every resource/action combination.
+        var wildcardPolicyName = "wildcard-all-resources-all-actions";
+        var wildcardPolicyExists = await db.AbacPolicies.AnyAsync(p => p.Name == wildcardPolicyName);
+        if (!wildcardPolicyExists)
+        {
+            var now = DateTime.UtcNow;
+            var wildcardPolicy = new AbacPolicy
             {
-                foreach (PermissionAction action in Enum.GetValues<PermissionAction>())
-                {
-                    var policy = new AbacPolicy
-                    {
-                        Id = Guid.NewGuid(),
-                        Name = $"{resource.ToString().ToLowerInvariant()}-{action.ToString().ToLowerInvariant()}",
-                        Description = $"Full access to {action.ToString().ToLowerInvariant()} on {resource.ToString().ToLowerInvariant()}",
-                        Effect = PermissionEffect.Allow,
-                        Priority = 1000,
-                        IsActive = true,
-                        ResourceType = resource,
-                        ActionType = action,
-                        RuleConnector = LogicalOperator.And,
-                        CreatedBy = adminUser.Id,
-                        CreatedAt = DateTime.UtcNow,
-                        UpdatedAt = DateTime.UtcNow
-                    };
+                Id = Guid.NewGuid(),
+                Name = wildcardPolicyName,
+                Description = "Full access to all resources and actions (wildcard policy)",
+                Effect = PermissionEffect.Allow,
+                Priority = 9999,
+                IsActive = true,
+                ResourceType = BaseResource.Wildcard,
+                ActionType = PermissionAction.Wildcard,
+                RuleConnector = LogicalOperator.And,
+                CreatedBy = adminUser.Id,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
 
-                    db.AbacPolicies.Add(policy);
-                    await db.SaveChangesAsync();
-
-                    db.RolePolicies.Add(new RolePolicy
-                    {
-                        Id = Guid.NewGuid(),
-                        RoleId = adminRole.Id,
-                        PolicyId = policy.Id,
-                        AssignedBy = adminUser.Id,
-                        AssignedAt = DateTime.UtcNow,
-                        Reason = "Default admin role permissions"
-                    });
-                }
-            }
-
+            db.AbacPolicies.Add(wildcardPolicy);
             await db.SaveChangesAsync();
-            Console.WriteLine("Admin policies created and assigned");
+
+            db.RolePolicies.Add(new RolePolicy
+            {
+                Id = Guid.NewGuid(),
+                RoleId = adminRole.Id,
+                PolicyId = wildcardPolicy.Id,
+                AssignedBy = adminUser.Id,
+                AssignedAt = now,
+                Reason = "Admin wildcard super-policy"
+            });
+            await db.SaveChangesAsync();
+            Console.WriteLine("Admin wildcard policy created and assigned");
         }
 
         var creatorPolicies = new[]
@@ -187,6 +189,59 @@ public static class AdminBootstrapService
                         Id = Guid.NewGuid(),
                         PolicyId = policyId,
                         AttributePath = AttributePath.ResourceApiKeyUserId,
+                        Operator = OperatorType.EqContextRef,
+                        ContextReferencePath = AttributePath.SubjectId,
+                        ValueType = Schema.TechtonicCms.Enums.ValueType.Uuid,
+                        IsActive = true,
+                        Order = 1,
+                        CreatedAt = now
+                    }
+                ]
+            };
+
+            db.AbacPolicies.Add(policy);
+        }
+
+        await db.SaveChangesAsync();
+
+        // Seed entry creator policies
+        var entryCreatorPolicies = new[]
+        {
+            (Name: "entries-read-by-creator",    Action: PermissionAction.Read),
+            (Name: "entries-update-by-creator",  Action: PermissionAction.Update),
+            (Name: "entries-delete-by-creator",  Action: PermissionAction.Delete),
+            (Name: "entries-publish-by-creator", Action: PermissionAction.Publish),
+            (Name: "entries-unpublish-by-creator", Action: PermissionAction.Unpublish),
+        };
+
+        foreach (var (name, action) in entryCreatorPolicies)
+        {
+            var exists = await db.AbacPolicies.AnyAsync(p => p.Name == name);
+            if (exists) continue;
+
+            var now = DateTime.UtcNow;
+            var policyId = Guid.NewGuid();
+            var policy = new AbacPolicy
+            {
+                Id = policyId,
+                Name = name,
+                Description = $"Allow entry {action.ToString().ToLowerInvariant()} for the entry's creator",
+                Effect = PermissionEffect.Allow,
+                Priority = 500,
+                IsActive = true,
+                ResourceType = BaseResource.Entries,
+                ActionType = action,
+                RuleConnector = LogicalOperator.And,
+                CreatedBy = adminUser.Id,
+                CreatedAt = now,
+                UpdatedAt = now,
+                Rules =
+                [
+                    new AbacPolicyRule
+                    {
+                        Id = Guid.NewGuid(),
+                        PolicyId = policyId,
+                        AttributePath = AttributePath.ResourceEntryCreatedBy,
                         Operator = OperatorType.EqContextRef,
                         ContextReferencePath = AttributePath.SubjectId,
                         ValueType = Schema.TechtonicCms.Enums.ValueType.Uuid,

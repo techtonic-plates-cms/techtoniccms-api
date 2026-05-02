@@ -113,10 +113,12 @@ public class UserMutation
         CreateUserInput input,
         [Service] TechtonicCmsDbContext db,
         [Service] PasswordService passwordService,
+        [Service] AbacService abacService,
         [Service] IHttpContextAccessor httpContextAccessor)
     {
         var currentUserId = GetUserId(httpContextAccessor);
 
+        PasswordService.ValidatePasswordStrength(input.Password);
         var passwordHash = passwordService.HashPassword(input.Password);
 
         var now = DateTime.UtcNow;
@@ -133,6 +135,30 @@ public class UserMutation
 
         db.Users.Add(user);
         await db.SaveChangesAsync();
+
+        // Validate caller can assign roles/policies to the new user
+        var hasRolesOrPolicies = (input.Roles?.Ids is { Length: > 0 })
+            || (input.Roles?.Assignments is { Length: > 0 })
+            || (input.Policies?.Ids is { Length: > 0 })
+            || (input.Policies?.Assignments is { Length: > 0 });
+
+        if (hasRolesOrPolicies)
+        {
+            try
+            {
+                await abacService.RequirePermissionAsync(currentUserId, BaseResource.Users, PermissionAction.Update, new Dictionary<string, object?>
+                {
+                    ["ResourceUserId"] = user.Id.ToString(),
+                    ["ResourceUserStatus"] = user.Status.ToString(),
+                });
+            }
+            catch
+            {
+                db.Users.Remove(user);
+                await db.SaveChangesAsync();
+                throw;
+            }
+        }
 
         if (input.Roles?.Ids is { Length: > 0 })
         {
@@ -288,6 +314,12 @@ public class UserMutation
         var user = await db.Users.FindAsync(id);
         if (user is not null)
         {
+            if (user.Name == "admin")
+                throw new GraphQLException(ErrorBuilder.New()
+                    .SetMessage("Cannot delete the admin user")
+                    .SetCode("FORBIDDEN")
+                    .Build());
+
             await abacService.RequirePermissionAsync(currentUserId, BaseResource.Users, PermissionAction.Delete, new Dictionary<string, object?>
             {
                 ["ResourceUserId"] = user.Id.ToString(),
@@ -341,6 +373,7 @@ public class UserMutation
                     .Build());
         }
 
+        PasswordService.ValidatePasswordStrength(input.NewPassword);
         var newHash = passwordService.HashPassword(input.NewPassword);
         user.PasswordHash = newHash;
         user.LastEditTime = DateTime.UtcNow;
@@ -366,6 +399,12 @@ public class UserMutation
                 .SetMessage("User not found")
                 .SetCode("NOT_FOUND")
                 .Build());
+
+        await abacService.RequirePermissionAsync(currentUserId, BaseResource.Users, PermissionAction.Update, new Dictionary<string, object?>
+        {
+            ["ResourceUserId"] = user.Id.ToString(),
+            ["ResourceUserStatus"] = user.Status.ToString(),
+        });
 
         var role = await db.Roles.FindAsync(input.RoleId);
         if (role is null)
@@ -409,6 +448,23 @@ public class UserMutation
     {
         var currentUserId = GetUserId(httpContextAccessor);
 
+        var user = await db.Users.FindAsync(userId);
+        if (user is not null)
+        {
+            await abacService.RequirePermissionAsync(currentUserId, BaseResource.Users, PermissionAction.Update, new Dictionary<string, object?>
+            {
+                ["ResourceUserId"] = user.Id.ToString(),
+                ["ResourceUserStatus"] = user.Status.ToString(),
+            });
+        }
+
+        var role = await db.Roles.FindAsync(roleId);
+        if (role is not null && role.Name == "admin")
+            throw new GraphQLException(ErrorBuilder.New()
+                .SetMessage("Cannot unassign the admin role")
+                .SetCode("FORBIDDEN")
+                .Build());
+
         var userRole = await db.UserRoles
             .FirstOrDefaultAsync(ur => ur.UserId == userId && ur.RoleId == roleId);
 
@@ -425,6 +481,7 @@ public class UserMutation
     public async Task<bool> AssignPolicy(
         AssignPolicyToUserInput input,
         [Service] TechtonicCmsDbContext db,
+        [Service] AbacService abacService,
         [Service] IHttpContextAccessor httpContextAccessor)
     {
         var currentUserId = GetUserId(httpContextAccessor);
@@ -437,6 +494,12 @@ public class UserMutation
                 .SetCode("NOT_FOUND")
                 .Build());
         }
+
+        await abacService.RequirePermissionAsync(currentUserId, BaseResource.Users, PermissionAction.Update, new Dictionary<string, object?>
+        {
+            ["ResourceUserId"] = user.Id.ToString(),
+            ["ResourceUserStatus"] = user.Status.ToString(),
+        });
 
         var policy = await db.AbacPolicies.FindAsync(input.PolicyId);
         if (policy is null)
@@ -481,8 +544,22 @@ public class UserMutation
     public async Task<bool> UnassignPolicy(
         Guid userId,
         Guid policyId,
-        [Service] TechtonicCmsDbContext db)
+        [Service] TechtonicCmsDbContext db,
+        [Service] AbacService abacService,
+        [Service] IHttpContextAccessor httpContextAccessor)
     {
+        var currentUserId = GetUserId(httpContextAccessor);
+
+        var user = await db.Users.FindAsync(userId);
+        if (user is not null)
+        {
+            await abacService.RequirePermissionAsync(currentUserId, BaseResource.Users, PermissionAction.Update, new Dictionary<string, object?>
+            {
+                ["ResourceUserId"] = user.Id.ToString(),
+                ["ResourceUserStatus"] = user.Status.ToString(),
+            });
+        }
+
         var userPolicy = await db.UserPolicies
             .FirstOrDefaultAsync(up => up.UserId == userId && up.PolicyId == policyId);
 
@@ -500,8 +577,22 @@ public class UserMutation
         Guid userId,
         Guid roleId,
         string? expiresAt,
-        [Service] TechtonicCmsDbContext db)
+        [Service] TechtonicCmsDbContext db,
+        [Service] AbacService abacService,
+        [Service] IHttpContextAccessor httpContextAccessor)
     {
+        var currentUserId = GetUserId(httpContextAccessor);
+
+        var user = await db.Users.FindAsync(userId);
+        if (user is not null)
+        {
+            await abacService.RequirePermissionAsync(currentUserId, BaseResource.Users, PermissionAction.Update, new Dictionary<string, object?>
+            {
+                ["ResourceUserId"] = user.Id.ToString(),
+                ["ResourceUserStatus"] = user.Status.ToString(),
+            });
+        }
+
         var userRole = await db.UserRoles
             .FirstOrDefaultAsync(ur => ur.UserId == userId && ur.RoleId == roleId);
 
@@ -525,8 +616,22 @@ public class UserMutation
         Guid policyId,
         string? expiresAt,
         string? reason,
-        [Service] TechtonicCmsDbContext db)
+        [Service] TechtonicCmsDbContext db,
+        [Service] AbacService abacService,
+        [Service] IHttpContextAccessor httpContextAccessor)
     {
+        var currentUserId = GetUserId(httpContextAccessor);
+
+        var user = await db.Users.FindAsync(userId);
+        if (user is not null)
+        {
+            await abacService.RequirePermissionAsync(currentUserId, BaseResource.Users, PermissionAction.Update, new Dictionary<string, object?>
+            {
+                ["ResourceUserId"] = user.Id.ToString(),
+                ["ResourceUserStatus"] = user.Status.ToString(),
+            });
+        }
+
         var userPolicy = await db.UserPolicies
             .FirstOrDefaultAsync(up => up.UserId == userId && up.PolicyId == policyId);
 

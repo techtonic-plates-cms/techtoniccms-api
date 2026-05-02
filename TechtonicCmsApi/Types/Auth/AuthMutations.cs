@@ -39,11 +39,12 @@ public class AuthMutation
                 .SetCode("UNAUTHENTICATED")
                 .Build());
 
-        if (user.Status == UserStatus.Inactive)
+        if (user.Status == UserStatus.Inactive || user.Status == UserStatus.Banned)
         {
             await sessionService.DeleteAllUserSessionsAsync(user.Id.ToString());
+            var message = user.Status == UserStatus.Banned ? "Account is banned" : "Account is inactive";
             throw new GraphQLException(ErrorBuilder.New()
-                .SetMessage("Account is inactive")
+                .SetMessage(message)
                 .SetCode("UNAUTHENTICATED")
                 .Build());
         }
@@ -127,12 +128,13 @@ public class AuthMutation
         var userId = Guid.Parse(tokenData.UserId);
 
         var user = await db.Users.FindAsync(userId);
-        if (user is null || user.Status == UserStatus.Inactive)
+        if (user is null || user.Status == UserStatus.Inactive || user.Status == UserStatus.Banned)
         {
             if (user is not null)
                 await sessionService.DeleteAllUserSessionsAsync(user.Id.ToString());
+            var message = user?.Status == UserStatus.Banned ? "Account is banned" : "Account is inactive";
             throw new GraphQLException(ErrorBuilder.New()
-                .SetMessage("Account is inactive")
+                .SetMessage(message)
                 .SetCode("UNAUTHENTICATED")
                 .Build());
         }

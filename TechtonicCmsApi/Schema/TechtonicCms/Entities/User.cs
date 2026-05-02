@@ -7,6 +7,7 @@ using TechtonicCmsApi.Schema.TechtonicCms.Enums;
 namespace TechtonicCmsApi.Schema.TechtonicCms.Entities;
 
 [Table("users")]
+[Index(nameof(Name), IsUnique = true)]
 public class User
 {
     [Key]

@@ -50,14 +50,9 @@ public class AssetQuery
     [UseFiltering]
     [UseSorting]
     public IQueryable<Asset> Assets(
-        [Service] TechtonicCmsDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] TechtonicCmsDbContext db)
     {
-        var userId = GetUserId(httpContextAccessor);
-
-        IQueryable<Asset> query = db.Assets.Where(a => a.IsPublic || a.UploadedBy == userId);
-
-        return query;
+        return db.Assets;
     }
 
     private static Guid GetUserId(IHttpContextAccessor httpContextAccessor)

@@ -60,7 +60,8 @@ public class AssetMutation
         [Service] TechtonicCmsDbContext db,
         [Service] S3Service s3Service,
         [Service] AbacService abacService,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] ILogger<AssetMutation> logger)
     {
         var userId = GetUserId(httpContextAccessor);
         var asset = await db.Assets.FindAsync(id);
@@ -83,8 +84,9 @@ public class AssetMutation
         {
             await s3Service.DeleteAsync(asset.Path);
         }
-        catch
+        catch (Exception ex)
         {
+            logger.LogWarning(ex, "Failed to delete asset {AssetId} from S3 at path {S3Path}", asset.Id, asset.Path);
         }
         db.Assets.Remove(asset);
         await db.SaveChangesAsync();

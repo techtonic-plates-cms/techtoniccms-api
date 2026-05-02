@@ -17,6 +17,12 @@ public class PasswordService
         HashLength = 32,
     };
 
+    public static void ValidatePasswordStrength(string password)
+    {
+        if (string.IsNullOrEmpty(password) || password.Length < 12)
+            throw new ArgumentException("Password must be at least 12 characters long.", nameof(password));
+    }
+
     public string HashPassword(string password)
     {
         var config = new Argon2Config

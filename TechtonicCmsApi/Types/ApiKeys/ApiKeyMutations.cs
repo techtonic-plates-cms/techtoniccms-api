@@ -39,6 +39,7 @@ public class ApiKeyMutation
         CreateApiKeyInput input,
         [Service] TechtonicCmsDbContext db,
         [Service] ApiKeyService apiKeyService,
+        [Service] AbacService abacService,
         [Service] IHttpContextAccessor httpContextAccessor)
     {
         var currentUserId = GetUserId(httpContextAccessor);
@@ -52,6 +53,11 @@ public class ApiKeyMutation
                     .SetMessage("User not found")
                     .SetCode("NOT_FOUND")
                     .Build());
+
+            await abacService.RequirePermissionAsync(currentUserId, BaseResource.ApiKeys, PermissionAction.Create, new Dictionary<string, object?>
+            {
+                ["ResourceApiKeyUserId"] = targetUserId.ToString(),
+            });
         }
 
         var (rawKey, hash, prefix) = apiKeyService.GenerateKey();

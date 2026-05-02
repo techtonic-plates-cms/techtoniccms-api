@@ -150,9 +150,9 @@ public class AbacService
 
         return await _db.AbacPolicies
             .Where(p => allPolicyIds.Contains(p.Id)
-                && p.ResourceType == resourceType
-                && p.ActionType == action
-                && p.IsActive)
+                && p.IsActive
+                && (p.ResourceType == resourceType || p.ResourceType == BaseResource.Wildcard)
+                && (p.ActionType == action || p.ActionType == PermissionAction.Wildcard))
             .ToListAsync();
     }
 
@@ -388,6 +388,21 @@ public class AbacService
                 ["ResourceCollectionCreatedBy"] = collection.CreatedBy.ToString(),
                 ["ResourceCollectionIsLocalized"] = collection.IsLocalized,
             },
+            (Schema.TechtonicCms.Entities.AbacAudit audit, BaseResource.Audits) => new Dictionary<string, object?>
+            {
+                ["ResourceFieldId"] = audit.Id.ToString(),
+                ["ResourceAuditUserId"] = audit.UserId?.ToString(),
+            },
+            (Schema.TechtonicCms.Entities.Entry entry, BaseResource.Entries) => new Dictionary<string, object?>
+            {
+                ["ResourceFieldId"] = entry.Id.ToString(),
+                ["ResourceEntryId"] = entry.Id.ToString(),
+                ["ResourceEntryStatus"] = entry.Status.ToString(),
+                ["ResourceEntryCreatedBy"] = entry.CreatedBy.ToString(),
+                ["ResourceEntryCollectionId"] = entry.CollectionId.ToString(),
+                ["ResourceEntryLocale"] = entry.Locale.ToString(),
+                ["ResourceEntryPublishedAt"] = entry.PublishedAt?.ToString("O"),
+            },
             _ => new Dictionary<string, object?>()
         };
     }
@@ -401,6 +416,7 @@ public class AbacService
         BaseResource.Assets => "UploadedBy",
         BaseResource.Collections => "CreatedBy",
         BaseResource.Users => "Id",
+        BaseResource.Entries => "CreatedBy",
         _ => null
     };
 
@@ -436,6 +452,14 @@ public class AbacService
             {
                 ["ResourceUserId"] = fakeOwnerStr,
                 ["ResourceUserStatus"] = "Active",
+            },
+            BaseResource.Entries => new Dictionary<string, object?>
+            {
+                ["ResourceEntryId"] = fakeOwnerStr,
+                ["ResourceEntryStatus"] = "Draft",
+                ["ResourceEntryCreatedBy"] = fakeOwnerStr,
+                ["ResourceEntryCollectionId"] = fakeOwnerStr,
+                ["ResourceEntryLocale"] = "En",
             },
             _ => new Dictionary<string, object?>()
         };

@@ -8,28 +8,19 @@ using TechtonicCmsApi.Schema.TechtonicCms.Enums;
 
 namespace TechtonicCmsApi.Types.Users;
 
-public class RoleRefDto
-{
-    public Guid Id { get; set; }
-    public string Name { get; set; } = "";
-    public string? Description { get; set; }
-    public DateTime? AssignedAt { get; set; }
-    public DateTime? ExpiresAt { get; set; }
-}
 
-public partial class RoleRefType : ObjectType<RoleRefDto>
+
+public partial class UserRoleType : ObjectType<UserRole>
 {
-    protected override void Configure(IObjectTypeDescriptor<RoleRefDto> descriptor)
+    protected override void Configure(IObjectTypeDescriptor<UserRole> descriptor)
     {
         descriptor.BindFieldsExplicitly();
 
-        descriptor.Name("RoleRef");
 
         descriptor.Field(r => r.Id).ID().IsProjected();
-        descriptor.Field(r => r.Name).Type<NonNullType<StringType>>().IsProjected();
-        descriptor.Field(r => r.Description).IsProjected();
         descriptor.Field(r => r.AssignedAt).IsProjected();
         descriptor.Field(r => r.ExpiresAt).IsProjected();
+        descriptor.Field(r => r.Role);
     }
 }
 
@@ -53,21 +44,13 @@ public partial class UserType : ObjectType<User>
     public class UserTypeResolvers
     {
         [UseProjection]
-        public IQueryable<RoleRefDto> GetRoles(
+        public IQueryable<UserRole> GetRoles(
         [Parent] User user,
         [Service] TechtonicCmsDbContext db)
         {
             return db.UserRoles
                 .Include(ur => ur.Role)
-                .Where(ur => ur.UserId == user.Id)
-                .Select(ur => new RoleRefDto
-                {
-                    Id = ur.Role.Id,
-                    Name = ur.Role.Name,
-                    Description = ur.Role.Description,
-                    AssignedAt = ur.AssignedAt,
-                    ExpiresAt = ur.ExpiresAt
-                });
+                .Where(ur => ur.UserId == user.Id);
         }
 
         [UseProjection]

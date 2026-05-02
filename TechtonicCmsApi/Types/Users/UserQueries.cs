@@ -54,7 +54,6 @@ public class UserQuery
     }
 
     [Authorize]
-    [AbacRequirePermission(BaseResource.Users, PermissionAction.Read)]
     [UsePaging(MaxPageSize = 100)]
     [UseAbacRowCheck(BaseResource.Users, PermissionAction.Read)]
     [UseFiltering]

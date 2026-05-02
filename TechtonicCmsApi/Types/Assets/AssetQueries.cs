@@ -43,7 +43,6 @@ public class AssetQuery
     }
 
     [Authorize]
-    [AbacRequirePermission(BaseResource.Assets, PermissionAction.Read)]
     [UsePaging(MaxPageSize = 100)]
     [UseAbacRowCheck(BaseResource.Assets, PermissionAction.Read)]
     [UseProjection]

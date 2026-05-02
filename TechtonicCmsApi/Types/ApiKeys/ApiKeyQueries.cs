@@ -42,7 +42,6 @@ public class ApiKeyQuery
     }
 
     [Authorize]
-    [AbacRequirePermission(BaseResource.ApiKeys, PermissionAction.Read)]
     [UsePaging(MaxPageSize = 100)]
     [UseAbacRowCheck(BaseResource.ApiKeys, PermissionAction.Read)]
     [UseFiltering]

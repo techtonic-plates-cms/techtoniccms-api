@@ -55,7 +55,6 @@ public class CollectionQuery
     }
 
     [Authorize]
-    [AbacRequirePermission(BaseResource.Collections, PermissionAction.Read)]
     [UsePaging(MaxPageSize = 100)]
     [UseAbacRowCheck(BaseResource.Collections, PermissionAction.Read)]
     [UseProjection]

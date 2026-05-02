@@ -17,7 +17,7 @@ public class CreateApiKeyInput
 
     public Guid? UserId { get; set; }
 
-    public string? ExpiresAt { get; set; }
+    public DateTime? ExpiresAt { get; set; }
 }
 
 public class UpdateApiKeyInput
@@ -27,7 +27,7 @@ public class UpdateApiKeyInput
 
     public string? Name { get; set; }
 
-    public string? ExpiresAt { get; set; }
+    public DateTime? ExpiresAt { get; set; }
 
     public bool? IsActive { get; set; }
 }
@@ -73,7 +73,7 @@ public class ApiKeyMutation
             CreatedAt = now,
             UpdatedAt = now,
             ExpiresAt = input.ExpiresAt is not null
-                ? DateTime.Parse(input.ExpiresAt, null, System.Globalization.DateTimeStyles.RoundtripKind)
+                ?input.ExpiresAt
                 : null,
             IsActive = true,
         };
@@ -117,7 +117,7 @@ public class ApiKeyMutation
             apiKey.Name = input.Name;
 
         if (input.ExpiresAt is not null)
-            apiKey.ExpiresAt = DateTime.Parse(input.ExpiresAt, null, System.Globalization.DateTimeStyles.RoundtripKind);
+            apiKey.ExpiresAt = input.ExpiresAt;
 
         if (input.IsActive.HasValue)
             apiKey.IsActive = input.IsActive.Value;

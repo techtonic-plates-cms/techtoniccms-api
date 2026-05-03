@@ -211,7 +211,7 @@ public static class LlmsEndpoints
             | API Keys | `apiKeys` | `apiKeys` | Create, revoke |
             | Audit | `audit` | — | Read ABAC audit logs |
             | Auth | `auth` | `auth` | Login, refresh, logout |
-            | Entries | `entries` | `entries` | **Dynamic** — see next section |
+            | Entries | `collections` → `entries` | `collections` → `entries` | **Dynamic** — see next section |
 
             All list queries support `[UsePaging(MaxPageSize = 100)]`, `[UseFiltering]`, and `[UseSorting]`.
 
@@ -437,32 +437,35 @@ public static class LlmsEndpoints
             ? entryType.Fields.Select(f => f.Name).ToList()
             : new List<string> { "id", "name", "slug", "status", "createdAt", "updatedAt", "publishedAt", "data" };
 
-        var dataFieldNames = collection.Fields.OrderBy(f => f.CreatedAt).Select(f => f.Name).ToList();
-        var dataBlock = dataFieldNames.Count == 0
-            ? "                # No custom fields defined"
-            : string.Join("\n", dataFieldNames.Select(n => $"                {n}"));
+        var dataBlock = dataObjType is not null
+            ? string.Join("\n", dataObjType.Fields.Select(f => $"                  {f.Name}"))
+            : collection.Fields.Count == 0
+                ? "                  # No custom fields defined"
+                : string.Join("\n", collection.Fields.OrderBy(f => f.CreatedAt).Select(f => $"                  {f.Name}"));
 
         lines.Add("**Example Query**");
         lines.Add("");
         lines.Add("```graphql");
         lines.Add("query {");
-        lines.Add("  entries {");
-        lines.Add($"    {camel}(first: 10) {{");
-        lines.Add("      edges {");
-        lines.Add("        node {");
+        lines.Add("  collections {");
+        lines.Add("    entries {");
+        lines.Add($"      {camel}(first: 10) {{");
+        lines.Add("        edges {");
+        lines.Add("          node {");
         foreach (var qf in queryFields)
         {
             if (qf == "data")
             {
-                lines.Add("          data {");
+                lines.Add("            data {");
                 lines.Add(dataBlock);
-                lines.Add("          }");
+                lines.Add("            }");
             }
             else
             {
-                lines.Add($"          {qf}");
+                lines.Add($"            {qf}");
             }
         }
+        lines.Add("          }");
         lines.Add("        }");
         lines.Add("      }");
         lines.Add("    }");
@@ -476,57 +479,59 @@ public static class LlmsEndpoints
         lines.Add("");
         lines.Add("```graphql");
         lines.Add("mutation {");
-        lines.Add("  entries {");
-        lines.Add($"    {camel} {{");
+        lines.Add("  collections {");
+        lines.Add("    entries {");
+        lines.Add($"      {camel} {{");
 
         if (mutType is not null && mutType.Fields.FirstOrDefault(f => f.Name == "create") is { } createField)
         {
-            lines.Add("      create(");
+            lines.Add("        create(");
             foreach (var arg in createField.Arguments)
             {
                 if (arg.Name == "data" && UnwrapType(arg.Type) is InputObjectType dataInput)
                 {
-                    lines.Add("        data: {");
+                    lines.Add("          data: {");
                     foreach (var inputField in dataInput.Fields)
                     {
-                        lines.Add($"          {inputField.Name}: <{FormatGraphQLType(inputField.Type)}>");
+                        lines.Add($"            {inputField.Name}: <{FormatGraphQLType(inputField.Type)}>");
                     }
-                    lines.Add("        }");
+                    lines.Add("          }");
                 }
                 else
                 {
-                    lines.Add($"        {arg.Name}: <{FormatGraphQLType(arg.Type)}>");
+                    lines.Add($"          {arg.Name}: <{FormatGraphQLType(arg.Type)}>");
                 }
             }
-            lines.Add("      ) {");
+            lines.Add("        ) {");
         }
         else
         {
-            lines.Add("      create(");
-            lines.Add("        name: \"...\",");
-            lines.Add("        slug: \"...\",");
-            lines.Add("        locale: En,");
-            lines.Add("        data: {");
+            lines.Add("        create(");
+            lines.Add("          name: \"...\",");
+            lines.Add("          slug: \"...\",");
+            lines.Add("          locale: En,");
+            lines.Add("          data: {");
             var requiredFields = collection.Fields.Where(f => f.IsRequired).OrderBy(f => f.CreatedAt).ToList();
             if (requiredFields.Count == 0)
             {
-                lines.Add("          # All fields are optional on create");
+                lines.Add("            # All fields are optional on create");
             }
             else
             {
                 foreach (var field in requiredFields)
                 {
-                    lines.Add($"          {field.Name}: <{MapFieldDataType(field)}>");
+                    lines.Add($"            {field.Name}: <{MapFieldDataType(field)}>");
                 }
             }
-            lines.Add("        }");
-            lines.Add("      ) {");
+            lines.Add("          }");
+            lines.Add("        ) {");
         }
 
-        lines.Add("        id");
-        lines.Add("        name");
-        lines.Add("        slug");
-        lines.Add("        status");
+        lines.Add("          id");
+        lines.Add("          name");
+        lines.Add("          slug");
+        lines.Add("          status");
+        lines.Add("        }");
         lines.Add("      }");
         lines.Add("    }");
         lines.Add("  }");
@@ -539,37 +544,39 @@ public static class LlmsEndpoints
         lines.Add("");
         lines.Add("```graphql");
         lines.Add("mutation {");
-        lines.Add("  entries {");
-        lines.Add($"    {camel} {{");
+        lines.Add("  collections {");
+        lines.Add("    entries {");
+        lines.Add($"      {camel} {{");
 
         if (mutType is not null && mutType.Fields.FirstOrDefault(f => f.Name == "update") is { } updateField)
         {
-            lines.Add("      update(");
+            lines.Add("        update(");
             foreach (var arg in updateField.Arguments)
             {
                 if (arg.Name == "data" && UnwrapType(arg.Type) is InputObjectType dataInput)
                 {
-                    lines.Add("        data: {");
+                    lines.Add("          data: {");
                     foreach (var inputField in dataInput.Fields)
                     {
-                        lines.Add($"          {inputField.Name}: <{FormatGraphQLType(inputField.Type)}>");
+                        lines.Add($"            {inputField.Name}: <{FormatGraphQLType(inputField.Type)}>");
                     }
-                    lines.Add("        }");
+                    lines.Add("          }");
                 }
                 else
                 {
-                    lines.Add($"        {arg.Name}: <{FormatGraphQLType(arg.Type)}>");
+                    lines.Add($"          {arg.Name}: <{FormatGraphQLType(arg.Type)}>");
                 }
             }
-            lines.Add("      ) {");
+            lines.Add("        ) {");
         }
         else
         {
-            lines.Add("      update(id: \"<uuid>\", data: { /* partial fields */ }) {");
+            lines.Add("        update(id: \"<uuid>\", data: { /* partial fields */ }) {");
         }
 
-        lines.Add("        id");
-        lines.Add("        name");
+        lines.Add("          id");
+        lines.Add("          name");
+        lines.Add("        }");
         lines.Add("      }");
         lines.Add("    }");
         lines.Add("  }");
@@ -582,8 +589,9 @@ public static class LlmsEndpoints
         lines.Add("");
         lines.Add("```graphql");
         lines.Add("mutation {");
-        lines.Add("  entries {");
-        lines.Add($"    {camel} {{");
+        lines.Add("  collections {");
+        lines.Add("    entries {");
+        lines.Add($"      {camel} {{");
 
         if (mutType is not null)
         {
@@ -593,18 +601,19 @@ public static class LlmsEndpoints
                 var argStr = string.Join(", ", args);
                 if (!string.IsNullOrEmpty(argStr))
                     argStr = $"({argStr})";
-                lines.Add($"      {mutField.Name}{argStr} {{ id status }}");
+                lines.Add($"        {mutField.Name}{argStr} {{ id status }}");
             }
         }
         else
         {
-            lines.Add("      publish(id: \"<uuid>\") { id status }");
-            lines.Add("      unpublish(id: \"<uuid>\") { id status }");
-            lines.Add("      archive(id: \"<uuid>\") { id status }");
-            lines.Add("      restore(id: \"<uuid>\") { id status }");
-            lines.Add("      delete(id: \"<uuid>\") { id status }");
+            lines.Add("        publish(id: \"<uuid>\") { id status }");
+            lines.Add("        unpublish(id: \"<uuid>\") { id status }");
+            lines.Add("        archive(id: \"<uuid>\") { id status }");
+            lines.Add("        restore(id: \"<uuid>\") { id status }");
+            lines.Add("        delete(id: \"<uuid>\") { id status }");
         }
 
+        lines.Add("      }");
         lines.Add("    }");
         lines.Add("  }");
         lines.Add("}");

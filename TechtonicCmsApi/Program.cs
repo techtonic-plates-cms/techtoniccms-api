@@ -88,7 +88,20 @@ builder.Services.AddRateLimiter(options =>
     };
 });
 
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+builder.Services.AddAuthentication(options =>
+    {
+        options.DefaultAuthenticateScheme = "MultiAuth";
+        options.DefaultChallengeScheme = "MultiAuth";
+    })
+    .AddPolicyScheme("MultiAuth", "MultiAuth", options =>
+    {
+        options.ForwardDefaultSelector = context =>
+        {
+            if (context.Request.Headers.ContainsKey("X-Api-Key"))
+                return "ApiKey";
+            return JwtBearerDefaults.AuthenticationScheme;
+        };
+    })
     .AddJwtBearer(options =>
     {
         options.TokenValidationParameters = new TokenValidationParameters

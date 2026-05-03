@@ -88,7 +88,7 @@ public class ApiKeyMutation
         };
     }
 
-    [Authorize("ApiKeys:Update")]
+    [Authorize]
     public async Task<Schema.TechtonicCms.Entities.ApiKey> UpdateApiKey(
         UpdateApiKeyInput input,
         [Service] TechtonicCmsDbContext db,
@@ -128,7 +128,7 @@ public class ApiKeyMutation
         return apiKey;
     }
 
-    [Authorize("ApiKeys:Delete")]
+    [Authorize]
     public async Task<bool> DeleteApiKey(
         Guid id,
         [Service] TechtonicCmsDbContext db,
@@ -156,7 +156,7 @@ public class ApiKeyMutation
         return true;
     }
 
-    [Authorize("ApiKeys:Update")]
+    [Authorize]
     public async Task<Schema.TechtonicCms.Entities.ApiKey> RevokeApiKey(
         Guid id,
         [Service] TechtonicCmsDbContext db,

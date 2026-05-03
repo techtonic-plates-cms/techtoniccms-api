@@ -146,6 +146,7 @@ builder.Services.AddHostedService<SchedulerService>();
 builder.Services.AddHttpContextAccessor();
 
 builder.AddGraphQL()
+.DisableIntrospection(false)
 .ModifyCostOptions(options =>
 {
     options.MaxFieldCost = 20000;
@@ -164,6 +165,7 @@ builder.AddGraphQL()
     .ModifyRequestOptions(options =>
     {
         options.IncludeExceptionDetails = builder.Environment.IsDevelopment();
+        
     })
     .AddTypeModule<CollectionTypeModule>()
     .TryAddTypeInterceptor<CollectionConnectionTypeInterceptor>()

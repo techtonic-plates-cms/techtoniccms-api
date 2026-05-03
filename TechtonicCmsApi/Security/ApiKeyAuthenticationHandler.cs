@@ -28,12 +28,19 @@ public class ApiKeyAuthenticationHandler : AuthenticationHandler<AuthenticationS
 
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
-        if (!Request.Headers.TryGetValue("X-Api-Key", out var headerValue))
+        if (!Request.Headers.TryGetValue("Authorization", out var headerValue))
         {
             return AuthenticateResult.NoResult();
         }
 
-        var rawKey = headerValue.ToString();
+        var authHeader = headerValue.ToString();
+        const string prefix = "X-Api-Key ";
+        if (!authHeader.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return AuthenticateResult.NoResult();
+        }
+
+        var rawKey = authHeader[prefix.Length..].Trim();
         var hash = _apiKeyService.ComputeHash(rawKey);
 
         await using var db = await _dbContextFactory.CreateDbContextAsync();

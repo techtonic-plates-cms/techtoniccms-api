@@ -97,8 +97,11 @@ builder.Services.AddAuthentication(options =>
     {
         options.ForwardDefaultSelector = context =>
         {
-            if (context.Request.Headers.ContainsKey("X-Api-Key"))
+            if (context.Request.Headers.TryGetValue("Authorization", out var authHeader) &&
+                authHeader.ToString().StartsWith("X-Api-Key ", StringComparison.OrdinalIgnoreCase))
+            {
                 return "ApiKey";
+            }
             return JwtBearerDefaults.AuthenticationScheme;
         };
     })

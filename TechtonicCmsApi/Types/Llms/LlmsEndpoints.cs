@@ -141,7 +141,7 @@ public static class LlmsEndpoints
 
             Some integrations may use API keys instead of JWTs:
             ```
-            X-Api-Key: <apiKey>
+            Authorization: X-Api-Key <apiKey>
             ```
 
             """;

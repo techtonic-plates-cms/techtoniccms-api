@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='utf-8' />
+<title>TechtonicCmsApi.Benchmarks.Benchmarks.AbacPolicyScalingBenchmark-20260506-002810</title>
+
+<style type="text/css">
+	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
+	td, th { padding: 6px 13px; border: 1px solid #ddd; text-align: right; }
+	tr { background-color: #fff; border-top: 1px solid #ccc; }
+	tr:nth-child(even) { background: #f8f8f8; }
+</style>
+</head>
+<body>
+<pre><code>
+BenchmarkDotNet v0.14.0, Ubuntu 24.04.4 LTS (Noble Numbat) (container)
+11th Gen Intel Core i7-11800H 2.30GHz, 1 CPU, 16 logical and 8 physical cores
+.NET SDK 10.0.203
+  [Host] : .NET 10.0.7 (10.0.726.21808), X64 RyuJIT AVX-512F+CD+BW+DQ+VL+VBMI
+</code></pre>
+<pre><code>Toolchain=InProcessEmitToolchain  InvocationCount=1  UnrollFactor=1  
+</code></pre>
+
+<table>
+<thead><tr><th>Method</th><th>PolicyCount</th><th>Mean</th><th>Error</th><th>StdDev</th><th>Median</th><th>Ratio</th><th>RatioSD</th><th>Rank</th><th>Allocated</th><th>Alloc Ratio</th>
+</tr>
+</thead><tbody><tr><td>WithCache</td><td>1</td><td>5.643 ms</td><td>0.1687 ms</td><td>0.4895 ms</td><td>5.623 ms</td><td>1.01</td><td>0.12</td><td>1</td><td>138.58 KB</td><td>1.00</td>
+</tr><tr><td>WithoutCache</td><td>1</td><td>14.589 ms</td><td>0.3432 ms</td><td>1.0012 ms</td><td>14.610 ms</td><td>2.60</td><td>0.28</td><td>2</td><td>256.24 KB</td><td>1.85</td>
+</tr><tr><td>WithCache</td><td>5</td><td>5.868 ms</td><td>0.2017 ms</td><td>0.5947 ms</td><td>5.740 ms</td><td>1.01</td><td>0.14</td><td>1</td><td>148.55 KB</td><td>1.00</td>
+</tr><tr><td>WithoutCache</td><td>5</td><td>14.673 ms</td><td>0.4209 ms</td><td>1.2277 ms</td><td>14.653 ms</td><td>2.53</td><td>0.32</td><td>2</td><td>278.69 KB</td><td>1.88</td>
+</tr><tr><td>WithCache</td><td>10</td><td>5.963 ms</td><td>0.2239 ms</td><td>0.6566 ms</td><td>5.940 ms</td><td>1.01</td><td>0.16</td><td>1</td><td>161.68 KB</td><td>1.00</td>
+</tr><tr><td>WithoutCache</td><td>10</td><td>14.462 ms</td><td>0.3214 ms</td><td>0.9272 ms</td><td>14.505 ms</td><td>2.45</td><td>0.31</td><td>2</td><td>306.43 KB</td><td>1.90</td>
+</tr><tr><td>WithCache</td><td>25</td><td>6.112 ms</td><td>0.1741 ms</td><td>0.5051 ms</td><td>6.138 ms</td><td>1.01</td><td>0.12</td><td>1</td><td>199.11 KB</td><td>1.00</td>
+</tr><tr><td>WithoutCache</td><td>25</td><td>16.447 ms</td><td>0.8871 ms</td><td>2.6157 ms</td><td>15.650 ms</td><td>2.71</td><td>0.49</td><td>2</td><td>388.63 KB</td><td>1.95</td>
+</tr><tr><td>WithCache</td><td>50</td><td>6.449 ms</td><td>0.1847 ms</td><td>0.5446 ms</td><td>6.481 ms</td><td>1.01</td><td>0.12</td><td>1</td><td>264.09 KB</td><td>1.00</td>
+</tr><tr><td>WithoutCache</td><td>50</td><td>16.572 ms</td><td>0.3628 ms</td><td>1.0641 ms</td><td>16.540 ms</td><td>2.59</td><td>0.28</td><td>2</td><td>528.99 KB</td><td>2.00</td>
+</tr></tbody></table>
+</body>
+</html>
